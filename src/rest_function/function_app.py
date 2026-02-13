@@ -19,7 +19,7 @@ def _json_response(payload: Any, status_code: int = 200) -> func.HttpResponse:
     )
 
 
-@app.route(route="api/orders", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+@app.route(route="orders", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
 def post_orders(req: func.HttpRequest) -> func.HttpResponse:
     logging.info("POST /api/orders")
 
@@ -50,7 +50,7 @@ def post_orders(req: func.HttpRequest) -> func.HttpResponse:
     return _json_response(response, status_code=200)
 
 
-@app.route(route="api/orders/{orderId}", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
+@app.route(route="orders/{orderId}", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
 def get_order(req: func.HttpRequest) -> func.HttpResponse:
     order_id = req.route_params.get("orderId", "")
     logging.info("GET /api/orders/%s", order_id)

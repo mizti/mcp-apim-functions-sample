@@ -1,12 +1,23 @@
 from __future__ import annotations
 
 import json
+import os
 import threading
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+try:
+    from azure.storage.blob import BlobServiceClient  # type: ignore
+except Exception:  # pragma: no cover
+    BlobServiceClient = None  # type: ignore
+
+try:
+    from azure.identity import DefaultAzureCredential  # type: ignore
+except Exception:  # pragma: no cover
+    DefaultAzureCredential = None  # type: ignore
 
 
 _MENU_PATH = Path(__file__).with_name("menu.json")
@@ -76,7 +87,115 @@ class InMemoryOrderStore:
                 self._idempotency[idempotency_key] = order.order_id
 
 
-STORE = InMemoryOrderStore()
+def _order_from_dict(data: dict[str, Any]) -> Order:
+    items: list[OrderLine] = []
+    for raw in data.get("items", []) or []:
+        if not isinstance(raw, dict):
+            continue
+        items.append(
+            OrderLine(
+                menu_item_id=str(raw.get("menuItemId", "")),
+                quantity=int(raw.get("quantity", 0) or 0),
+                line_total=int(raw.get("lineTotal", 0) or 0),
+            )
+        )
+
+    return Order(
+        order_id=str(data.get("orderId", "")),
+        status=str(data.get("status", "")),
+        items=items,
+        total=int(data.get("total", 0) or 0),
+        currency=str(data.get("currency", "")),
+        created_at=str(data.get("createdAt", "")),
+    )
+
+
+class BlobOrderStore:
+    def __init__(
+        self,
+        *,
+        connection_string: str | None = None,
+        account_url: str | None = None,
+        container_name: str = "orders",
+    ) -> None:
+        if BlobServiceClient is None:
+            raise RuntimeError("azure-storage-blob is not available")
+
+        if connection_string:
+            self._service = BlobServiceClient.from_connection_string(connection_string)
+        else:
+            if not account_url:
+                raise RuntimeError("account_url is required when connection_string is not provided")
+            if DefaultAzureCredential is None:
+                raise RuntimeError("azure-identity is not available")
+
+            credential = DefaultAzureCredential(exclude_interactive_browser_credential=True)
+            self._service = BlobServiceClient(account_url=account_url, credential=credential)
+        self._container = self._service.get_container_client(container_name)
+        try:
+            self._container.create_container()
+        except Exception:
+            # Container likely already exists.
+            pass
+
+    def _order_blob_name(self, order_id: str) -> str:
+        return f"orders/{order_id}.json"
+
+    def _idem_blob_name(self, key: str) -> str:
+        return f"idempotency/{key}.txt"
+
+    def get_by_id(self, order_id: str) -> Order | None:
+        try:
+            blob = self._container.get_blob_client(self._order_blob_name(order_id))
+            data = blob.download_blob().readall()
+        except Exception:
+            return None
+
+        try:
+            obj = json.loads((data or b"{}").decode("utf-8"))
+            return _order_from_dict(obj) if isinstance(obj, dict) else None
+        except Exception:
+            return None
+
+    def get_by_idempotency_key(self, key: str) -> Order | None:
+        try:
+            blob = self._container.get_blob_client(self._idem_blob_name(key))
+            data = blob.download_blob().readall()
+            order_id = (data or b"").decode("utf-8").strip()
+        except Exception:
+            return None
+
+        return self.get_by_id(order_id) if order_id else None
+
+    def save(self, order: Order, idempotency_key: str | None) -> None:
+        payload = json.dumps(order.to_dict(), ensure_ascii=False).encode("utf-8")
+        self._container.upload_blob(self._order_blob_name(order.order_id), payload, overwrite=True)
+        if idempotency_key:
+            self._container.upload_blob(self._idem_blob_name(idempotency_key), order.order_id.encode("utf-8"), overwrite=True)
+
+
+def _get_store() -> InMemoryOrderStore | BlobOrderStore:
+    # Option A: classic connection-string based setting
+    connection_string = os.environ.get("AzureWebJobsStorage")
+    if connection_string and BlobServiceClient is not None:
+        try:
+            return BlobOrderStore(connection_string=connection_string)
+        except Exception:
+            return InMemoryOrderStore()
+
+    # Option B: Flex Consumption / identity-based storage (accountName only)
+    account_name = os.environ.get("AzureWebJobsStorage__accountName")
+    if account_name and BlobServiceClient is not None and DefaultAzureCredential is not None:
+        account_url = f"https://{account_name}.blob.core.windows.net"
+        try:
+            return BlobOrderStore(account_url=account_url)
+        except Exception:
+            return InMemoryOrderStore()
+    return InMemoryOrderStore()
+
+
+# Use a stable store per worker process.
+STORE = _get_store()
 
 
 class ValidationError(Exception):
