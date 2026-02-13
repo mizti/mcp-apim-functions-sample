@@ -1,0 +1,41 @@
+{
+  "menuVersion": "v1",
+  "categories": ["ramen", "side"],
+  "items": [
+    {
+      "id": "ramen-shoyu",
+      "name": "醤油ラーメン",
+      "category": "ramen",
+      "basePrice": 900,
+      "available": true,
+      "description": "定番の醤油ラーメン",
+      "allergens": ["wheat", "soy"],
+      "options": []
+    },
+    {
+      "id": "ramen-miso",
+      "name": "味噌ラーメン",
+      "category": "ramen",
+      "basePrice": 980,
+      "available": true,
+      "description": "コクのある味噌スープ",
+      "allergens": ["wheat", "soy"],
+      "options": []
+    },
+    {
+      "id": "gyoza",
+      "name": "餃子",
+      "category": "side",
+      "basePrice": 420,
+      "available": true,
+      "description": "焼き餃子（6個）",
+      "allergens": ["wheat"],
+      "options": []
+    }
+  ],
+  "constraints": {
+    "openHours": "11:00-21:00",
+    "maxItemsPerOrder": 10,
+    "notes": ["混雑時は提供が遅れる場合があります"]
+  }
+}

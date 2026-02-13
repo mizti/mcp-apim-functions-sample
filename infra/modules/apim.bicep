@@ -3,16 +3,8 @@ targetScope = 'resourceGroup'
 @description('Deployment location')
 param location string
 
-@description('Environment name used for naming (dev/test/prod)')
-@allowed([
-  'dev'
-  'test'
-  'prod'
-])
+@description('Environment name used for naming')
 param environmentName string
-
-@description('Prefix for resource names')
-param namePrefix string
 
 @description('APIM publisher email')
 param apimPublisherEmail string
@@ -42,7 +34,7 @@ param apimSkuCapacity int = 1
 
 var abbrs = loadJsonContent('../abbreviations.json')
 var token7 = take(toLower(resourceToken), 7)
-var apimServiceName = toLower('${abbrs.apiManagementService}${namePrefix}-${environmentName}-${token7}')
+var apimServiceName = toLower('${abbrs.apiManagementService}${environmentName}-${token7}')
 
 resource apim 'Microsoft.ApiManagement/service@2024-05-01' = {
   name: apimServiceName

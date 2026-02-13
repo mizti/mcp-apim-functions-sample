@@ -9,25 +9,16 @@ param tags object = {
   SecurityControl: 'Ignore'
 }
 
-@description('Deployment location')
-param location string = deployment().location
+param location string
 
-@description('Environment name used for naming (dev/test/prod)')
-@allowed([
-  'dev'
-  'test'
-  'prod'
-])
+@description('Environment name used for naming. This should match AZURE_ENV_NAME so azd can discover the environment resource group by tag/name.')
 param environmentName string
 
-@description('Prefix for resource names')
-param namePrefix string = 'mcp'
-
 @description('APIM publisher email')
-param apimPublisherEmail string
+param apimPublisherEmail string ='ks@example.com'
 
 @description('APIM publisher name')
-param apimPublisherName string
+param apimPublisherName string ='KS Company'
 
 @description('APIM SKU. MCP Servers feature support depends on SKU, but this template only creates the APIM instance.')
 @allowed([
@@ -71,7 +62,9 @@ var token8 = take(resourceToken, 8)
 resource rg 'Microsoft.Resources/resourceGroups@2021-04-01' = {
   name: !empty(resourceGroupName) ? resourceGroupName : '${abbrs.resourcesResourceGroups}${environmentName}'
   location: location
-  tags: tags
+  tags: union(tags, {
+    'azd-env-name': environmentName
+  })
 }
 
 module monitoring './modules/monitoring.bicep' = {
@@ -80,7 +73,6 @@ module monitoring './modules/monitoring.bicep' = {
   params: {
     location: location
     environmentName: environmentName
-    namePrefix: namePrefix
     resourceToken: resourceToken
   }
 }
@@ -91,7 +83,6 @@ module menuFunction './modules/functions.bicep' = {
   params: {
     location: location
     environmentName: environmentName
-    namePrefix: namePrefix
     appRole: 'menu'
     appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString
     resourceToken: resourceToken
@@ -108,7 +99,6 @@ module ordersFunction './modules/functions.bicep' = {
   params: {
     location: location
     environmentName: environmentName
-    namePrefix: namePrefix
     appRole: 'orders'
     appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString
     resourceToken: resourceToken
@@ -125,7 +115,6 @@ module apim './modules/apim.bicep' = {
   params: {
     location: location
     environmentName: environmentName
-    namePrefix: namePrefix
     apimPublisherEmail: apimPublisherEmail
     apimPublisherName: apimPublisherName
     apimSkuName: apimSkuName

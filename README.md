@@ -43,6 +43,8 @@ azd env set APIM_PUBLISHER_NAME "Your Name"
 azd up
 ```
 
+Note: Resource naming uses `AZURE_ENV_NAME` via `infra/main.parameters.json` so the Azure environment name you enter for `azd` is reflected in provisioned resource names.
+
 After `azd up`, note the printed APIM gateway base URL and subscription key.
 
 Call the REST API (example):

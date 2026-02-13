@@ -3,16 +3,8 @@ targetScope = 'resourceGroup'
 @description('Deployment location')
 param location string
 
-@description('Environment name used for naming (dev/test/prod)')
-@allowed([
-  'dev'
-  'test'
-  'prod'
-])
+@description('Environment name used for naming')
 param environmentName string
-
-@description('Prefix for resource names')
-param namePrefix string
 
 @description('Short name used in the Function App name (for example: menu, orders)')
 param appRole string
@@ -51,8 +43,8 @@ var abbrs = loadJsonContent('../abbreviations.json')
 var nameToken = toLower(uniqueString(resourceToken, resourceGroup().id, appRole))
 var token7 = take(nameToken, 7)
 
-var functionName = toLower('${abbrs.webSitesFunctions}${namePrefix}-${environmentName}-${appRole}-${token7}')
-var planName = toLower('${abbrs.webServerFarms}${namePrefix}-${environmentName}-${appRole}-${token7}')
+var functionName = toLower('${abbrs.webSitesFunctions}${environmentName}-${appRole}-${token7}')
+var planName = toLower('${abbrs.webServerFarms}${environmentName}-${appRole}-${token7}')
 
 resource flexPlan 'Microsoft.Web/serverfarms@2024-04-01' = {
   name: planName
@@ -69,7 +61,10 @@ resource flexPlan 'Microsoft.Web/serverfarms@2024-04-01' = {
 
 // Create a dedicated storage account per Function App.
 // NOTE: storage account names must be 3-24 chars and globally unique.
-var storageBaseName = toLower('${abbrs.storageStorageAccounts}${namePrefix}${environmentName}${appRole}${take(nameToken, 24)}')
+// Storage account names can only contain lowercase letters and numbers.
+// AZURE_ENV_NAME often contains hyphens, so we remove them for storage naming.
+var storageEnvironmentName = replace(environmentName, '-', '')
+var storageBaseName = toLower('${abbrs.storageStorageAccounts}${storageEnvironmentName}${appRole}${take(nameToken, 24)}')
 var storageAccountName = take(storageBaseName, 24)
 
 resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
@@ -112,6 +107,9 @@ resource functionApp 'Microsoft.Web/sites@2024-04-01' = {
   name: functionName
   location: location
   kind: 'functionapp,linux'
+  tags: {
+    'azd-service-name': appRole
+  }
   identity: {
     type: 'SystemAssigned'
   }

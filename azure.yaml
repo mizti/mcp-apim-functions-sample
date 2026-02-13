@@ -1,5 +1,16 @@
 name: mcp-apim-functions-sample
 metadata:
   template: mcp-apim-functions-sample
+
+services:
+  menu:
+    project: src/mcp_function
+    language: python
+    host: function
+  orders:
+    project: src/rest_function
+    language: python
+    host: function
+
 infra:
   path: infra

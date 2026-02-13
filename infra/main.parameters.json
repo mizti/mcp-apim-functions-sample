@@ -8,9 +8,6 @@
     "environmentName": {
       "value": "${AZURE_ENV_NAME}"
     },
-    "namePrefix": {
-      "value": "mcp"
-    },
     "apimPublisherEmail": {
       "value": "${APIM_PUBLISHER_EMAIL}"
     },
