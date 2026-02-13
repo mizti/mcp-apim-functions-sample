@@ -1,0 +1,5 @@
+name: mcp-apim-functions-sample
+metadata:
+  template: mcp-apim-functions-sample
+infra:
+  path: infra

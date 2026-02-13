@@ -10,7 +10,7 @@ Azure reference implementation of MCP server with API Management and Functions
 This is a minimal Azure sample that exposes, through a single Azure API Management (APIM) gateway:
 
 - An MCP server hosted on Azure Functions (Python programming model v2) exposing **Tools** (read-only, restaurant menu scenario)
-- A small REST API hosted on Azure Functions for **state-changing** operations (create/read orders)
+- A small REST API hosted on Azure Functions for **state-changing** operations (create/read orders), additionally exposed by APIM as **MCP tools**
 
 It is designed for learning and validation, and can be deployed end-to-end with Azure Developer CLI:
 
@@ -21,10 +21,10 @@ It is designed for learning and validation, and can be deployed end-to-end with 
 
 Endpoints (APIM public):
 
-- MCP (Streamable HTTP): `POST /mcp` (APIM rewrites to the Functions MCP extension endpoint `/runtime/webhooks/mcp`)
-- REST: `POST /api/orders`, `GET /api/orders/{orderId}`
+- MCP server (menu/constraints, Streamable HTTP): APIM **Existing MCP server** endpoint URL (shown in `azd up` output)
+- MCP server (orders, Streamable HTTP): APIM **Expose REST API as MCP server** endpoint URL (shown in `azd up` output)
 
-Authentication (sample): APIM subscription ke
+Authentication (sample): APIM subscription key.
 
 ### How to use
 
@@ -38,6 +38,8 @@ Deploy:
 
 ```bash
 azd auth login
+azd env set APIM_PUBLISHER_EMAIL "you@example.com"
+azd env set APIM_PUBLISHER_NAME "Your Name"
 azd up
 ```
 
@@ -55,7 +57,7 @@ curl -sS -X POST "${APIM_BASE_URL}/api/orders" \
 Call the MCP server:
 
 - Use any MCP client that supports **Streamable HTTP**.
-- For VS Code / GitHub Copilot, configure the server URL as `${APIM_BASE_URL}/mcp` and include the `Ocp-Apim-Subscription-Key` header.
+- For VS Code / GitHub Copilot, configure the server URL(s) printed by `azd up` and include the `Ocp-Apim-Subscription-Key` header.
 
 Clean up:
 
@@ -83,8 +85,8 @@ azd down
 
 エンドポイント（APIM 外向け公開）:
 
-- MCP（Streamable HTTP）: `POST /mcp`（APIM が Functions 側の `/runtime/webhooks/mcp` へ URI Rewrite）
-- REST: `POST /api/orders`, `GET /api/orders/{orderId}`
+- MCP server（参照系: メニュー/制約。Streamable HTTP）: APIM の **Existing MCP server** の Server URL（`azd up` 出力に表示）
+- MCP server（注文系: orders 操作を tools として公開。Streamable HTTP）: APIM の **REST API as MCP server** の Server URL（`azd up` 出力に表示）
 
 認証（サンプル）: APIM Subscription Key。
 
@@ -100,6 +102,8 @@ azd down
 
 ```bash
 azd auth login
+azd env set APIM_PUBLISHER_EMAIL "you@example.com"
+azd env set APIM_PUBLISHER_NAME "Your Name"
 azd up
 ```
 
@@ -117,7 +121,7 @@ curl -sS -X POST "${APIM_BASE_URL}/api/orders" \
 MCP サーバーの利用:
 
 - **Streamable HTTP** に対応した MCP クライアントを使用してください。
-- VS Code / GitHub Copilot の場合は `${APIM_BASE_URL}/mcp` をサーバー URL に設定し、ヘッダーに `Ocp-Apim-Subscription-Key` を付与します。
+- VS Code / GitHub Copilot の場合は `azd up` の出力に表示される MCP Server URL をサーバー URL に設定し、ヘッダーに `Ocp-Apim-Subscription-Key` を付与します。
 
 削除:
 

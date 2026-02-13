@@ -74,16 +74,23 @@
 
 * Function App A：MCP サーバー（①）
 * Function App B：REST API（②）
-* Azure API Management（Gateway）
+* Azure API Management（Gateway / AI Gateway）
 * Application Insights
 
-### 4.2 公開パス（APIM）
+### 4.2 公開方式（APIM）
 
-| 種別   | パス                      | 説明                   |
-| ---- | ----------------------- | -------------------- |
-| MCP  | `/mcp`                  | MCP エンドポイント（Streamable HTTP） |
-| REST | `/api/orders`           | 注文作成                 |
-| REST | `/api/orders/{orderId}` | 注文参照                 |
+本サンプルでは、クライアント/エージェントは **HTTP REST を直接呼び出さず**、APIM が提供する **MCP Servers 機能**を通じて **MCP Tools として**利用できることを主目的とする。
+
+APIM は MCP Servers 機能として、以下 2 種類の MCP サーバー公開方法を併用する：
+
+* **Existing MCP server**（既存の MCP サーバーを APIM 経由で公開）
+  * Backend: Function App A（MCP extension の Streamable HTTP エンドポイント）
+  * 提供ツール: メニュー/制約（参照系）
+* **REST API as MCP server**（APIM が管理する REST API を MCP サーバーとして公開）
+  * Backend: Function App B（REST API）
+  * 提供ツール: 注文作成/注文参照（更新系/参照系）
+
+補足：APIM の MCP Server の具体的な URL（Server URL）は、作成した MCP server の名称/ベースパスに依存するため、`azd up` の出力として表示する。
 
 ---
 
@@ -105,9 +112,7 @@
 本サンプルでは **推奨の Streamable HTTP** を採用する。
 
 * Functions の MCP エンドポイント：`/runtime/webhooks/mcp`
-* APIM の外向け公開パス：`/mcp`
-
-APIM は受信した `/mcp` リクエストをバックエンドの `/runtime/webhooks/mcp` に **URI Rewrite** して中継する。
+* APIM の外向け公開：**Existing MCP server** として APIM に登録し、APIM が提供する MCP Server URL（Streamable HTTP）経由で利用する
 
 ### 5.1.2 実装する MCP Tools一覧
 
@@ -183,7 +188,10 @@ APIM は受信した `/mcp` リクエストをバックエンドの `/runtime/we
 
 ## 5.2 ② REST API（Function App B）
 
-### 5.2.1 注文作成
+本サンプルでは ② を「REST API として実装」するが、クライアント/エージェントからは **APIM が公開する MCP tools** として利用できることを要件とする。
+APIM 側では ② を通常の REST API として取り込み（Managed API）、その API operations を選択して **REST API as MCP server** として公開する。
+
+### 5.2.1 注文作成（REST API）
 
 * `POST /api/orders`
 
@@ -244,20 +252,16 @@ APIM は受信した `/mcp` リクエストをバックエンドの `/runtime/we
 
 ## 6. APIM 設定方針
 
-* MCP API
+本サンプルの APIM は、以下の 2 つの MCP server を提供する：
 
-  * Public path: `POST /mcp`
-  * Backend path: `POST /runtime/webhooks/mcp`
-  * Policy: inbound で `/mcp` → `/runtime/webhooks/mcp` に URI Rewrite
+1. **Existing MCP server**（①の公開）
+   * Function App A（`/runtime/webhooks/mcp`）を、APIM の MCP Servers として登録して公開する
+   * ① の tools は Function App A が定義する（APIM 側では tools を定義しない）
+2. **REST API as MCP server**（②の公開）
+   * Function App B の REST API を APIM に取り込み、操作（operations）を tools として公開する
+   * 例：`POST /api/orders`、`GET /api/orders/{orderId}` を tools として選択
 
-  補足：Streamable HTTP はレスポンスがストリーミングされる場合があるため、APIM 側でバッファリング等によりストリームが阻害されないことを前提とする。
-
-* REST API
-
-  * Public paths:
-
-    * `POST /api/orders`
-    * `GET /api/orders/{orderId}`
+補足：APIM の MCP server は Streamable HTTP を利用する。ポリシーでレスポンスボディを参照するとストリーミング挙動を阻害し得るため、MCP server スコープ/グローバルスコープの診断設定やポリシー設計に注意する。
 
 補足：REST 側は `/api/*` としてそのまま中継し、MCP 側のみ APIM で URI Rewrite して `/runtime/webhooks/mcp` に転送する。
 
@@ -303,13 +307,16 @@ APIM は受信した `/mcp` リクエストをバックエンドの `/runtime/we
   * Function Apps (2つ) 作成・デプロイ（Flex Consumption）
   * Storage Account 作成（Functions のホストストレージ）
   * APIM 作成・API登録
+  * APIM の MCP Servers 作成
+    * Existing MCP server（①）
+    * REST API as MCP server（②）
   * Application Insights 作成
 
 ### 出力
 
 * APIM Gateway URL
-* MCP Endpoint URL
-* REST API URL
+* MCP Server URL（①: menu/constraints など参照系）
+* MCP Server URL（②: orders 操作を tools として公開）
 * Subscription Key（デモ用途）
 
 ---
@@ -317,11 +324,12 @@ APIM は受信した `/mcp` リクエストをバックエンドの `/runtime/we
 ## 9. 受け入れ条件
 
 * `azd up` のみで環境構築可能
-* APIM 経由で以下が成功する
+* APIM 経由で以下が成功する（いずれも MCP tools として）
 
-  * MCP `tools/list`
-  * MCP `tools/call get_list_menus`
-  * REST `POST /api/orders`
+  * ① の MCP server に対して `tools/list`
+  * ① の MCP server に対して `tools/call get_list_menus`
+  * ② の MCP server に対して `tools/list`（注文系 tools が列挙される）
+  * ② の MCP server に対して 注文作成/参照の tool 呼び出し
 * メニュー定義が ①②で一致している
 
 ---
