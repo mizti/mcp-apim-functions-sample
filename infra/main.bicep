@@ -124,6 +124,7 @@ module apim './modules/apim.bicep' = {
   }
 }
 /*
+//MCPサーバーを登録するBicepの書き方が見つけられていない
 module apimSettings './modules/apim-settings.bicep' = {
   name: 'apim-settings-${environmentName}-${token8}'
   scope: rg
