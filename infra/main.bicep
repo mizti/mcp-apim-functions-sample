@@ -123,6 +123,17 @@ module apim './modules/apim.bicep' = {
     resourceToken: resourceToken
   }
 }
+/*
+module apimSettings './modules/apim-settings.bicep' = {
+  name: 'apim-settings-${environmentName}-${token8}'
+  scope: rg
+  params: {
+    apimName: apim.outputs.apimName
+    menuFunctionBaseUrl: menuFunction.outputs.functionBaseUrl
+    ordersFunctionBaseUrl: ordersFunction.outputs.functionBaseUrl
+  }
+}
+*/
 
 @description('APIM gateway base URL')
 output apimGatewayUrl string = apim.outputs.apimGatewayUrl

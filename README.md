@@ -104,13 +104,13 @@ azd down
 
 ### このリポジトリの利用方法
 
-前提:
+#### 前提:
 
 - Azure サブスクリプション
 - Azure Developer CLI（`azd`）
 - Azure CLI（`az`）
 
-デプロイ:
+#### デプロイ:
 
 ```bash
 azd auth login
@@ -121,7 +121,13 @@ azd up
 
 `azd up` の出力に表示される APIM のベース URL と Subscription Key を控えてください。
 
-REST API 呼び出し例:
+#### Fuctionsテスト
+以下のコマンドで関数アプリが正常に動作しているか確認することができます。
+```bash
+./tests/functions_smoke_test.sh
+```
+
+手動でREST APIを呼び出したい場合は以下を参考にしてください:
 
 ```bash
 curl -sS -X POST "${APIM_BASE_URL}/api/orders" \
@@ -130,16 +136,45 @@ curl -sS -X POST "${APIM_BASE_URL}/api/orders" \
 	-d '{"menuVersion":"v1","items":[{"menuItemId":"ramen-shoyu","quantity":1}],"note":"No onions"}'
 ```
 
-MCP サーバーの利用:
+#### API Management上の設定
 
-- **Streamable HTTP** に対応した MCP クライアントを使用してください。
-- VS Code / GitHub Copilot の場合は `azd up` の出力に表示される MCP Server URL をサーバー URL に設定し、ヘッダーに `Ocp-Apim-Subscription-Key` を付与します。
+※ 本来MCP設定もBicepで可能かと思われますが、十分なドキュメント情報がないためAPIMのMCP設定は
+ひとまずポータルで行ってください。
 
-スモークテスト:
+API Management経由でMCPを設定できるようにしたい場合には以下を設定してください。
 
-- `./tests/apim_smoke_test.sh` を実行すると、APIM 経由で REST + MCP の疎通確認ができます。
+1. Orders APIの登録（準備）
+ - APIs > API > Create from definition > OpenAPIからdocs/api.yamlを登録する。
+ - 登録後、Settingsから``https://<Order 関数アプリURL>/apiをWeb service URLに設定
+ - API URL suffixを空にする（apiを指定すると重複）
 
-削除:
+2. Orders MCPの登録
+ - MCPサーバー > MCPサーバーの作成から「API を MCP サーバーとして公開する」を選択する
+ - APIとしてRestaurants Order APIを選択、API操作はすべてのAPIを選択する
+ - 新しいMCPサーバーの設定として以下を指定して「作成」
+   - Display Name: Retaurant-Order-MCP
+   - Name: restaurant-order-mcp
+   - 説明: Menuの料理をオーダーできます
+
+3. Menu MCPの登録
+ - MCPサーバー > MCPサーバーの作成から「既存の MCP サーバーを公開する」を選択する
+ - 新しいMCPサーバーの設定として以下を指定して「作成」
+   - MCP サーバーのベース URL: https://<Menu MCP関数アプリのURL>/menu-mcp を指定
+   - Display name: Menu List MCP
+   - Name: menu-list-mcp
+   - 説明: このレストランのメニューの一覧を参照できます
+
+以上でバックエンドの関数アプリをAPI ManagementでMCPとして公開できます。
+
+登録されたMCPの設定やポリシーを変更することでサブスクリプションキー認証を掛けたり、様々なポリシーを適用できます。また、APIと同様に製品等を経由して公開することも可能です。
+
+
+```bash
+./tests/apim_smoke_test.sh
+```
+を実行すると、APIM 経由で MCP toolsの疎通確認ができます。
+
+#### 削除:
 
 ```bash
 azd down

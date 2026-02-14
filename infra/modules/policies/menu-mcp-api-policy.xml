@@ -1,0 +1,16 @@
+<policies>
+  <inbound>
+    <base />
+    <set-backend-service backend-id="menu-mcp-backend" />
+    <rewrite-uri template="/runtime/webhooks/mcp" copy-unmatched-params="true" />
+  </inbound>
+  <backend>
+    <base />
+  </backend>
+  <outbound>
+    <base />
+  </outbound>
+  <on-error>
+    <base />
+  </on-error>
+</policies>
