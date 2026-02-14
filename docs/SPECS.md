@@ -267,7 +267,8 @@ APIM 側では ② を通常の REST API として取り込み（Managed API）�
 
 ### セキュリティ
 
-* APIM Subscription Key を必須
+* APIM Subscription Key を（サンプルでは）利用する
+  * APIM 側設定により Subscription Key を不要にすることも可能であるため、テストスクリプト等は **Key が無い環境でも動作できる**ようにしておく
 * Functions 側の認証は最小限
   * MCP extension の既定では Functions の system key（`mcp_extension`）が要求されるが、本サンプルでは APIM Subscription Key のみに寄せるため、Functions 側は `host.json` の `extensions.mcp.system.webhookAuthorizationLevel` を `Anonymous` にして key 要求を無効化する
 
@@ -329,7 +330,8 @@ APIM 側では ② を通常の REST API として取り込み（Managed API）�
   * ① の MCP server に対して `tools/list`
   * ① の MCP server に対して `tools/call get_list_menus`
   * ② の MCP server に対して `tools/list`（注文系 tools が列挙される）
-  * ② の MCP server に対して 注文作成/参照の tool 呼び出し
+  * ② の MCP server に対して 注文作成の tool 呼び出し
+  * （任意）② の MCP server に対して 注文参照の tool 呼び出し
 * メニュー定義が ①②で一致している
 
 ---

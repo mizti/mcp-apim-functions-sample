@@ -26,6 +26,8 @@ Endpoints (APIM public):
 
 Authentication (sample): APIM subscription key.
 
+Note: Depending on your APIM configuration, the subscription key may be optional. The included smoke test script supports both modes.
+
 ### How to use
 
 Prerequisites:
@@ -61,6 +63,12 @@ Call the MCP server:
 - Use any MCP client that supports **Streamable HTTP**.
 - For VS Code / GitHub Copilot, configure the server URL(s) printed by `azd up` and include the `Ocp-Apim-Subscription-Key` header.
 
+Note: APIM MCP endpoints may respond with SSE-framed output (`event:` / `data:`) even when the backend uses Streamable HTTP.
+
+Smoke test:
+
+- Run `./tests/apim_smoke_test.sh` to validate REST + MCP through APIM.
+
 Clean up:
 
 ```bash
@@ -91,6 +99,8 @@ azd down
 - MCP server（注文系: orders 操作を tools として公開。Streamable HTTP）: APIM の **REST API as MCP server** の Server URL（`azd up` 出力に表示）
 
 認証（サンプル）: APIM Subscription Key。
+
+注: APIM の設定によっては Subscription Key を不要にできます。本リポジトリのスモークテストはどちらの設定でも動作するようにしています。
 
 ### このリポジトリの利用方法
 
@@ -124,6 +134,10 @@ MCP サーバーの利用:
 
 - **Streamable HTTP** に対応した MCP クライアントを使用してください。
 - VS Code / GitHub Copilot の場合は `azd up` の出力に表示される MCP Server URL をサーバー URL に設定し、ヘッダーに `Ocp-Apim-Subscription-Key` を付与します。
+
+スモークテスト:
+
+- `./tests/apim_smoke_test.sh` を実行すると、APIM 経由で REST + MCP の疎通確認ができます。
 
 削除:
 

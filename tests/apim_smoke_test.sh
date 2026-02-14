@@ -7,7 +7,7 @@
 # - Validates:
 #   - REST API through APIM: POST/GET /api/orders
 #   - MCP server (Existing MCP server): tools/list + menu tools/call
-#   - MCP server (REST API as MCP server): tools/list + orders tools/call
+#   - MCP server (REST API as MCP server): tools/list + orders tools/call (create)
 #
 # Usage:
 #   ./tests/apim_smoke_test.sh
@@ -398,7 +398,6 @@ dump_body_mcp "$BODY"
 # Parsing `tools/list` is brittle due to SSE framing differences, so we keep the
 # `tools/list` call above as a health check, but hardcode tool names for calls.
 CREATE_TOOL="createAnOrder"
-GET_TOOL="getAnOrder"
 
 info "Test MCP-ORDERS-2: tools/call $CREATE_TOOL"
 ORDERS_CREATE_ARGS_DIRECT='{
