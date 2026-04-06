@@ -12,12 +12,12 @@ from rpc import parse_tool_context
 app = func.FunctionApp()
 
 
-_TOOL_PROPERTIES_MENU_DETAILS = json.dumps(
+_TOOL_PROPERTIES_TRACKING_ID = json.dumps(
     [
         {
-            "name": "itemId",
+            "name": "trackingId",
             "propertyType": "string",
-            "description": "Menu item id (example: ramen-shoyu)",
+            "description": "Tracking ID (example: QS-001)",
             "required": True,
         }
     ],
@@ -25,92 +25,98 @@ _TOOL_PROPERTIES_MENU_DETAILS = json.dumps(
 )
 
 
-def _load_menu() -> dict[str, Any]:
-    menu_path = Path(__file__).with_name("menu.json")
-    return json.loads(menu_path.read_text(encoding="utf-8"))
+def _load_data() -> dict[str, Any]:
+    data_path = Path(__file__).with_name("shipments.json")
+    return json.loads(data_path.read_text(encoding="utf-8"))
 
 
 @app.mcp_tool_trigger(
     arg_name="context",
-    tool_name="get_list_menus",
-    description="Get the restaurant menu list.",
-    tool_properties=json.dumps([], ensure_ascii=False),
+    tool_name="track_shipment",
+    description="Track a shipment status by tracking ID.",
+    tool_properties=_TOOL_PROPERTIES_TRACKING_ID,
 )
-def get_list_menus(context: str) -> str:
-    _ = parse_tool_context(context)
-
-    menu = _load_menu()
-    items = menu.get("items", [])
-
-    response = {
-        "menuVersion": menu.get("menuVersion", "v1"),
-        "categories": menu.get("categories", []),
-        "items": [
-            {
-                "id": item.get("id"),
-                "name": item.get("name"),
-                "category": item.get("category"),
-                "basePrice": item.get("basePrice"),
-                "available": item.get("available", True),
-            }
-            for item in items
-        ],
-    }
-
-    logging.info("MCP tool get_list_menus called")
-    return json.dumps(response, ensure_ascii=False)
-
-
-@app.mcp_tool_trigger(
-    arg_name="context",
-    tool_name="get_menu_details",
-    description="Get details for a specific menu item.",
-    tool_properties=_TOOL_PROPERTIES_MENU_DETAILS,
-)
-def get_menu_details(context: str) -> str:
+def track_shipment(context: str) -> str:
     call = parse_tool_context(context)
-    item_id = str(call.arguments.get("itemId", ""))
+    tracking_id = str(call.arguments.get("trackingId", ""))
 
-    if not item_id:
-        return "Missing required argument: itemId"
+    if not tracking_id:
+        return "Missing required argument: trackingId"
 
-    menu = _load_menu()
-    items = menu.get("items", [])
+    data = _load_data()
+    shipments = data.get("shipments", [])
 
-    item = next((x for x in items if x.get("id") == item_id), None)
-    if not item:
-        return f"Menu item not found: {item_id}"
+    shipment = next((s for s in shipments if s.get("trackingId") == tracking_id), None)
+    if not shipment:
+        return f"Shipment not found: {tracking_id}"
 
     response = {
-        "id": item.get("id"),
-        "name": item.get("name"),
-        "description": item.get("description", ""),
-        "basePrice": item.get("basePrice"),
-        "allergens": item.get("allergens", []),
-        "options": item.get("options", []),
+        "trackingId": shipment.get("trackingId"),
+        "status": shipment.get("status"),
+        "lastUpdated": shipment.get("lastUpdated", ""),
     }
 
-    logging.info("MCP tool get_menu_details called: %s", item_id)
+    logging.info("MCP tool track_shipment called: %s", tracking_id)
     return json.dumps(response, ensure_ascii=False)
 
 
 @app.mcp_tool_trigger(
     arg_name="context",
-    tool_name="get_constraints",
-    description="Get ordering constraints (hours, limits, notes).",
-    tool_properties=json.dumps([], ensure_ascii=False),
+    tool_name="get_shipment_details",
+    description="Get full details for a shipment by tracking ID.",
+    tool_properties=_TOOL_PROPERTIES_TRACKING_ID,
 )
-def get_constraints(context: str) -> str:
-    _ = parse_tool_context(context)
+def get_shipment_details(context: str) -> str:
+    call = parse_tool_context(context)
+    tracking_id = str(call.arguments.get("trackingId", ""))
 
-    menu = _load_menu()
-    constraints = menu.get("constraints", {})
+    if not tracking_id:
+        return "Missing required argument: trackingId"
+
+    data = _load_data()
+    shipments = data.get("shipments", [])
+
+    shipment = next((s for s in shipments if s.get("trackingId") == tracking_id), None)
+    if not shipment:
+        return f"Shipment not found: {tracking_id}"
 
     response = {
-        "openHours": constraints.get("openHours", "11:00-21:00"),
-        "maxItemsPerOrder": constraints.get("maxItemsPerOrder", 10),
-        "notes": constraints.get("notes", []),
+        "trackingId": shipment.get("trackingId"),
+        "status": shipment.get("status"),
+        "senderName": shipment.get("senderName", ""),
+        "recipientName": shipment.get("recipientName", ""),
+        "from": shipment.get("from", ""),
+        "to": shipment.get("to", ""),
+        "weightKg": shipment.get("weightKg"),
+        "sizeCm": shipment.get("sizeCm", ""),
+        "createdAt": shipment.get("createdAt", ""),
+        "lastUpdated": shipment.get("lastUpdated", ""),
     }
 
-    logging.info("MCP tool get_constraints called")
+    logging.info("MCP tool get_shipment_details called: %s", tracking_id)
+    return json.dumps(response, ensure_ascii=False)
+
+
+@app.mcp_tool_trigger(
+    arg_name="context",
+    tool_name="get_shipping_rules",
+    description="Get shipping rules and constraints (hours, weight limits, prohibited items, service area).",
+    tool_properties=json.dumps([], ensure_ascii=False),
+)
+def get_shipping_rules(context: str) -> str:
+    _ = parse_tool_context(context)
+
+    data = _load_data()
+    rules = data.get("rules", {})
+
+    response = {
+        "acceptanceHours": rules.get("acceptanceHours", "08:00-20:00"),
+        "maxWeightKg": rules.get("maxWeightKg", 30),
+        "maxSizeCm": rules.get("maxSizeCm", "3辺合計160cm以内"),
+        "maxPackagesPerRequest": rules.get("maxPackagesPerRequest", 5),
+        "prohibitedItems": rules.get("prohibitedItems", []),
+        "serviceArea": rules.get("serviceArea", "全国（離島除く）"),
+    }
+
+    logging.info("MCP tool get_shipping_rules called")
     return json.dumps(response, ensure_ascii=False)

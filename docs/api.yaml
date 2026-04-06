@@ -1,20 +1,20 @@
 openapi: 3.0.3
 info:
-  title: Restaurant Orders API
+  title: Shipment API
   description: |
-    Minimal REST API for creating and reading orders.
+    Minimal REST API for creating and reading shipments.
 
     This OpenAPI document is derived from docs/SPECS.md in this repository.
   version: 1.0.0
 servers:
-  - url: /
-    description: Same host (e.g., APIM gateway base URL)
+  - url: /api
+    description: Same host (e.g., APIM gateway base URL). The /api path becomes the APIM API URL suffix.
 paths:
-  /api/orders:
+  /shipments:
     post:
-      operationId: createOrder
-      summary: Create an order
-      description: Create a new order.
+      operationId: createShipment
+      summary: Create a shipment
+      description: Register a new shipment for delivery.
       parameters:
         - in: header
           name: Idempotency-Key
@@ -27,63 +27,56 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateOrderRequest"
+              $ref: "#/components/schemas/CreateShipmentRequest"
             examples:
               example:
                 value:
-                  menuVersion: v1
-                  items:
-                    - menuItemId: ramen-shoyu
-                      quantity: 1
-                  note: No onions
-                  pickupTime: "2026-02-04T13:30:00+09:00"
+                  senderName: 田中太郎
+                  recipientName: 佐藤花子
+                  from: 東京都千代田区
+                  to: 大阪府大阪市
+                  weightKg: 10
+                  sizeCm: "40x30x20"
+                  note: 割れ物注意
       responses:
         "200":
-          description: Order created
+          description: Shipment created
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CreateOrderResponse"
+                $ref: "#/components/schemas/CreateShipmentResponse"
               examples:
                 example:
                   value:
-                    orderId: ord_xxxxxxxx
-                    status: confirmed
-                    total: 900
-                    currency: JPY
-                    createdAt: "2026-02-04T13:00:00+09:00"
+                    trackingId: QS-xxxxxxxx
+                    status: pending
+                    createdAt: "2026-04-03T10:00:00+09:00"
                     validationWarnings: []
         "400":
-          description: Bad Request (invalid menuItemId, invalid quantity, etc.)
+          description: Bad Request (missing required fields, weight over limit, etc.)
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-        "409":
-          description: Conflict (menuVersion mismatch)
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-  /api/orders/{orderId}:
+  /shipments/{trackingId}:
     get:
-      operationId: getOrder
-      summary: Get an order
-      description: Get an existing order by id.
+      operationId: getShipment
+      summary: Get a shipment
+      description: Get an existing shipment by tracking ID.
       parameters:
         - in: path
-          name: orderId
+          name: trackingId
           required: true
           schema:
             type: string
-          description: Order identifier (e.g., ord_xxxxxxxx)
+          description: Tracking identifier (e.g., QS-001)
       responses:
         "200":
-          description: Order
+          description: Shipment
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/GetOrderResponse"
+                $ref: "#/components/schemas/GetShipmentResponse"
         "404":
           description: Not Found
           content:
@@ -92,134 +85,110 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
 components:
   schemas:
-    CreateOrderRequest:
+    CreateShipmentRequest:
       type: object
       additionalProperties: false
       required:
-        - menuVersion
-        - items
+        - recipientName
+        - from
+        - to
       properties:
-        menuVersion:
+        senderName:
           type: string
-          description: Menu version expected by the server.
-          example: v1
-        items:
-          type: array
-          minItems: 1
-          description: Items to order.
-          items:
-            $ref: "#/components/schemas/OrderItemInput"
+          description: Sender name.
+          example: 田中太郎
+        recipientName:
+          type: string
+          description: Recipient name.
+          example: 佐藤花子
+        from:
+          type: string
+          description: Origin address.
+          example: 東京都千代田区
+        to:
+          type: string
+          description: Destination address.
+          example: 大阪府大阪市
+        weightKg:
+          type: number
+          format: double
+          description: Weight in kilograms.
+          example: 10
+        sizeCm:
+          type: string
+          description: Package dimensions (e.g., "40x30x20").
+          example: "40x30x20"
         note:
           type: string
-          description: Optional note for the order.
-          example: No onions
-        pickupTime:
-          type: string
-          format: date-time
-          description: Optional pickup time (RFC 3339).
-          example: "2026-02-04T13:30:00+09:00"
-    OrderItemInput:
+          description: Optional note for the shipment.
+          example: 割れ物注意
+    CreateShipmentResponse:
       type: object
       additionalProperties: false
       required:
-        - menuItemId
-        - quantity
-      properties:
-        menuItemId:
-          type: string
-          description: Menu item identifier.
-          example: ramen-shoyu
-        quantity:
-          type: integer
-          format: int32
-          minimum: 1
-          description: Quantity (> 0).
-          example: 1
-    CreateOrderResponse:
-      type: object
-      additionalProperties: false
-      required:
-        - orderId
+        - trackingId
         - status
-        - total
-        - currency
         - createdAt
         - validationWarnings
       properties:
-        orderId:
+        trackingId:
           type: string
-          example: ord_xxxxxxxx
+          example: QS-xxxxxxxx
         status:
           type: string
-          example: confirmed
-        total:
-          type: integer
-          format: int32
-          example: 900
-        currency:
-          type: string
-          example: JPY
+          example: pending
         createdAt:
           type: string
           format: date-time
-          example: "2026-02-04T13:00:00+09:00"
+          example: "2026-04-03T10:00:00+09:00"
         validationWarnings:
           type: array
           items:
             type: string
           example: []
-    GetOrderResponse:
+    GetShipmentResponse:
       type: object
       additionalProperties: false
       required:
-        - orderId
+        - trackingId
         - status
-        - items
-        - total
-        - currency
+        - recipientName
+        - from
+        - to
         - createdAt
       properties:
-        orderId:
+        trackingId:
           type: string
-          example: ord_xxxxxxxx
+          example: QS-001
         status:
           type: string
-          example: confirmed
-        items:
-          type: array
-          items:
-            $ref: "#/components/schemas/OrderLineItem"
-        total:
-          type: integer
-          format: int32
-          example: 900
-        currency:
+          example: delivered
+        senderName:
           type: string
-          example: JPY
+          example: 田中太郎
+        recipientName:
+          type: string
+          example: 佐藤花子
+        from:
+          type: string
+          example: 東京都千代田区
+        to:
+          type: string
+          example: 大阪府大阪市
+        weightKg:
+          type: number
+          format: double
+          example: 10
+        sizeCm:
+          type: string
+          example: "40x30x20"
+        note:
+          type: string
+          example: 割れ物注意
         createdAt:
           type: string
           format: date-time
-          example: "2026-02-04T13:00:00+09:00"
-    OrderLineItem:
-      type: object
-      additionalProperties: false
-      required:
-        - menuItemId
-        - quantity
-        - lineTotal
-      properties:
-        menuItemId:
-          type: string
-          example: ramen-shoyu
-        quantity:
-          type: integer
-          format: int32
-          minimum: 1
-          example: 1
-        lineTotal:
-          type: integer
-          format: int32
-          example: 900
+          example: "2026-04-01T09:00:00+09:00"
     ErrorResponse:
       type: object
       additionalProperties: false

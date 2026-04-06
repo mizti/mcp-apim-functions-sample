@@ -6,7 +6,7 @@ param location string
 @description('Environment name used for naming')
 param environmentName string
 
-@description('Short name used in the Function App name (for example: menu, orders)')
+@description('Short name used in the Function App name (for example: mcp, rest)')
 param appRole string
 
 @description('Application Insights connection string (from monitoring module)')
