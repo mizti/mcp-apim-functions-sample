@@ -9,8 +9,8 @@ Azure reference implementation of MCP server with API Management and Functions
 
 This is a minimal Azure sample that exposes, through a single Azure API Management (APIM) gateway:
 
-- An MCP server hosted on Azure Functions (Python programming model v2) exposing **Tools** (read-only, restaurant menu scenario)
-- A small REST API hosted on Azure Functions for **state-changing** operations (create/read orders), additionally exposed by APIM as **MCP tools**
+- An MCP server hosted on Azure Functions (Python programming model v2) exposing **Tools** (read-only, shipment tracking scenario)
+- A small REST API hosted on Azure Functions for **state-changing** operations (create/read shipments), additionally exposed by APIM as **MCP tools**
 
 It is designed for learning and validation, and can be deployed end-to-end with Azure Developer CLI:
 
@@ -21,8 +21,8 @@ It is designed for learning and validation, and can be deployed end-to-end with 
 
 Endpoints (APIM public):
 
-- MCP server (menu/constraints, Streamable HTTP): APIM **Existing MCP server** endpoint URL (shown in `azd up` output)
-- MCP server (orders, Streamable HTTP): APIM **Expose REST API as MCP server** endpoint URL (shown in `azd up` output)
+- MCP server (shipment tracking/details/rules, Streamable HTTP): APIM **Existing MCP server** endpoint URL (shown in `azd up` output)
+- MCP server (shipments, Streamable HTTP): APIM **Expose REST API as MCP server** endpoint URL (shown in `azd up` output)
 
 Authentication (sample): APIM subscription key.
 
@@ -52,10 +52,10 @@ After `azd up`, note the printed APIM gateway base URL and subscription key.
 Call the REST API (example):
 
 ```bash
-curl -sS -X POST "${APIM_BASE_URL}/api/orders" \
+curl -sS -X POST "${APIM_BASE_URL}/api/shipments" \
 	-H "Content-Type: application/json" \
 	-H "Ocp-Apim-Subscription-Key: ${APIM_SUBSCRIPTION_KEY}" \
-	-d '{"menuVersion":"v1","items":[{"menuItemId":"ramen-shoyu","quantity":1}],"note":"No onions"}'
+	-d '{"recipientName":"佐藤花子","from":"東京都千代田区","to":"大阪府大阪市","weightKg":10,"sizeCm":"40x30x20","note":"割れ物注意"}'
 ```
 
 Call the MCP server:
@@ -83,8 +83,8 @@ azd down
 
 このリポジトリは、単一の Azure API Management（APIM）をゲートウェイとして、次を同時に公開する最小サンプルです。
 
-- Azure Functions（Python プログラミングモデル v2）で動作する **MCP サーバー**（参照系の **Tools** を公開。レストランメニュー想定）
-- Azure Functions で動作する **REST API**（注文の作成/参照など、状態変更系）
+- Azure Functions（Python プログラミングモデル v2）で動作する **MCP サーバー**（参照系の **Tools** を公開。配送追跡・配送詳細・配送ルール）
+- Azure Functions で動作する **REST API**（配送荷物の登録/参照など、状態変更系）
 
 学習・検証用途のため、機能は最小限です。Azure Developer CLI により一括デプロイできます。
 
@@ -95,8 +95,8 @@ azd down
 
 エンドポイント（APIM 外向け公開）:
 
-- MCP server（参照系: メニュー/制約。Streamable HTTP）: APIM の **Existing MCP server** の Server URL（`azd up` 出力に表示）
-- MCP server（注文系: orders 操作を tools として公開。Streamable HTTP）: APIM の **REST API as MCP server** の Server URL（`azd up` 出力に表示）
+- MCP server（参照系: 配送追跡/配送詳細/配送ルール。Streamable HTTP）: APIM の **Existing MCP server** の Server URL（`azd up` 出力に表示）
+- MCP server（配送系: shipments 操作を tools として公開。Streamable HTTP）: APIM の **REST API as MCP server** の Server URL（`azd up` 出力に表示）
 
 認証（サンプル）: APIM Subscription Key。
 
@@ -130,10 +130,10 @@ azd up
 手動でREST APIを呼び出したい場合は以下を参考にしてください:
 
 ```bash
-curl -sS -X POST "${APIM_BASE_URL}/api/orders" \
+curl -sS -X POST "${APIM_BASE_URL}/api/shipments" \
 	-H "Content-Type: application/json" \
 	-H "Ocp-Apim-Subscription-Key: ${APIM_SUBSCRIPTION_KEY}" \
-	-d '{"menuVersion":"v1","items":[{"menuItemId":"ramen-shoyu","quantity":1}],"note":"No onions"}'
+	-d '{"recipientName":"佐藤花子","from":"東京都千代田区","to":"大阪府大阪市","weightKg":10,"sizeCm":"40x30x20","note":"割れ物注意"}'
 ```
 
 #### API Management上の設定
@@ -143,26 +143,38 @@ curl -sS -X POST "${APIM_BASE_URL}/api/orders" \
 
 API Management経由でMCPを設定できるようにしたい場合には以下を設定してください。
 
-1. Orders APIの登録（準備）
- - APIs > API > Create from definition > OpenAPIからdocs/api.yamlを登録する。
- - 登録後、Settingsから``https://<Order 関数アプリURL>/apiをWeb service URLに設定
- - API URL suffixを空にする（apiを指定すると重複）
+1. Shipment APIの登録（準備）
+ - APIs > API > Create from definition > OpenAPIからdocs/api.yamlを開く。
+   - Display name: Shipment API
+   - Name: shipmant-api
+   - API URL suffix: api
+ を指定してCreate
+ - 登録後、Settingsから
+   - ``https://<Shipment REST 関数アプリURL>/api``をWeb service URLに設定(これはバックエンドの指定に相当します)
+   - **Subscription required のチェックを外す**（本サンプルでは認証を最小限にするため）
+   - ![alt text](images/api-setting.png)
+ - Save する
 
-2. Orders MCPの登録
+1. Shipment REST MCPの登録
  - MCPサーバー > MCPサーバーの作成から「API を MCP サーバーとして公開する」を選択する
- - APIとしてRestaurants Order APIを選択、API操作はすべてのAPIを選択する
+ - APIとしてShipment APIを選択、API操作はすべてのAPIを選択する
  - 新しいMCPサーバーの設定として以下を指定して「作成」
-   - Display Name: Retaurant-Order-MCP
-   - Name: restaurant-order-mcp
-   - 説明: Menuの料理をオーダーできます
+   - Display Name: Shipment-REST-MCP
+   - Name: shipment-rest-mcp
+   - 説明: 配送荷物の登録・参照ができます
 
-3. Menu MCPの登録
+![alt text](images/apitomcp.png)
+
+3. Shipment Tracking MCPの登録
  - MCPサーバー > MCPサーバーの作成から「既存の MCP サーバーを公開する」を選択する
  - 新しいMCPサーバーの設定として以下を指定して「作成」
-   - MCP サーバーのベース URL: https://<Menu MCP関数アプリのURL>/menu-mcp を指定
-   - Display name: Menu List MCP
-   - Name: menu-list-mcp
-   - 説明: このレストランのメニューの一覧を参照できます
+   - MCP サーバーのベース URL: https://<Shipment MCP関数アプリのURL> を指定
+   - Display name: Shipment Tracking MCP
+   - Name: shipment-tracking-mcp
+   - ベースパス: shipment-mcp
+   - 説明: 配送の追跡、配送詳細の参照、配送ルールの確認ができます
+
+![alt text](images/mcptomcp.png)
 
 以上でバックエンドの関数アプリをAPI ManagementでMCPとして公開できます。
 

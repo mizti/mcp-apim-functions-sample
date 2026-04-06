@@ -1,0 +1,51 @@
+{
+  "shipments": [
+    {
+      "trackingId": "QS-001",
+      "status": "delivered",
+      "senderName": "田中太郎",
+      "recipientName": "佐藤花子",
+      "from": "東京都千代田区",
+      "to": "大阪府大阪市",
+      "weightKg": 10,
+      "sizeCm": "40x30x20",
+      "note": "割れ物注意",
+      "createdAt": "2026-04-01T09:00:00+09:00",
+      "lastUpdated": "2026-04-02T14:30:00+09:00"
+    },
+    {
+      "trackingId": "QS-002",
+      "status": "in_transit",
+      "senderName": "鈴木一郎",
+      "recipientName": "高橋健太",
+      "from": "神奈川県横浜市",
+      "to": "愛知県名古屋市",
+      "weightKg": 5,
+      "sizeCm": "30x20x15",
+      "note": "",
+      "createdAt": "2026-04-02T10:00:00+09:00",
+      "lastUpdated": "2026-04-03T08:00:00+09:00"
+    },
+    {
+      "trackingId": "QS-003",
+      "status": "pending",
+      "senderName": "山田次郎",
+      "recipientName": "伊藤美咲",
+      "from": "千葉県千葉市",
+      "to": "福岡県福岡市",
+      "weightKg": 15,
+      "sizeCm": "60x40x30",
+      "note": "天地無用",
+      "createdAt": "2026-04-03T07:00:00+09:00",
+      "lastUpdated": "2026-04-03T07:00:00+09:00"
+    }
+  ],
+  "rules": {
+    "acceptanceHours": "08:00-20:00",
+    "maxWeightKg": 30,
+    "maxSizeCm": "3辺合計160cm以内",
+    "maxPackagesPerRequest": 5,
+    "prohibitedItems": ["危険物", "動植物"],
+    "serviceArea": "全国（離島除く）"
+  }
+}

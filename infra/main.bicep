@@ -77,13 +77,13 @@ module monitoring './modules/monitoring.bicep' = {
   }
 }
 
-module menuFunction './modules/functions.bicep' = {
-  name: 'function-menu-${environmentName}-${token8}'
+module mcpFunction './modules/functions.bicep' = {
+  name: 'function-mcp-${environmentName}-${token8}'
   scope: rg
   params: {
     location: location
     environmentName: environmentName
-    appRole: 'menu'
+    appRole: 'mcp'
     appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString
     resourceToken: resourceToken
     functionRuntimeName: functionRuntimeName
@@ -93,13 +93,13 @@ module menuFunction './modules/functions.bicep' = {
   }
 }
 
-module ordersFunction './modules/functions.bicep' = {
-  name: 'function-orders-${environmentName}-${token8}'
+module restFunction './modules/functions.bicep' = {
+  name: 'function-rest-${environmentName}-${token8}'
   scope: rg
   params: {
     location: location
     environmentName: environmentName
-    appRole: 'orders'
+    appRole: 'rest'
     appInsightsConnectionString: monitoring.outputs.appInsightsConnectionString
     resourceToken: resourceToken
     functionRuntimeName: functionRuntimeName
@@ -130,8 +130,8 @@ module apimSettings './modules/apim-settings.bicep' = {
   scope: rg
   params: {
     apimName: apim.outputs.apimName
-    menuFunctionBaseUrl: menuFunction.outputs.functionBaseUrl
-    ordersFunctionBaseUrl: ordersFunction.outputs.functionBaseUrl
+    shipmentMcpFunctionBaseUrl: mcpFunction.outputs.functionBaseUrl
+    shipmentRestFunctionBaseUrl: restFunction.outputs.functionBaseUrl
   }
 }
 */
@@ -142,14 +142,14 @@ output apimGatewayUrl string = apim.outputs.apimGatewayUrl
 @description('APIM service name')
 output apimName string = apim.outputs.apimName
 
-@description('Menu Function (MCP) hostname (direct)')
-output menuFunctionHostname string = menuFunction.outputs.functionHostname
+@description('MCP Function (shipment tracking) hostname (direct)')
+output mcpFunctionHostname string = mcpFunction.outputs.functionHostname
 
-@description('Orders Function hostname (direct)')
-output ordersFunctionHostname string = ordersFunction.outputs.functionHostname
+@description('REST Function (shipments) hostname (direct)')
+output restFunctionHostname string = restFunction.outputs.functionHostname
 
-@description('Menu Function MCP endpoint (direct). This is not APIM-gatewayed yet.')
-output menuFunctionMcpEndpoint string = menuFunction.outputs.functionMcpEndpoint
+@description('MCP Function endpoint (direct). This is not APIM-gatewayed yet.')
+output mcpFunctionMcpEndpoint string = mcpFunction.outputs.functionMcpEndpoint
 
-@description('Orders Function base URL (direct). This is not APIM-gatewayed yet.')
-output ordersFunctionBaseUrl string = ordersFunction.outputs.functionBaseUrl
+@description('REST Function base URL (direct). This is not APIM-gatewayed yet.')
+output restFunctionBaseUrl string = restFunction.outputs.functionBaseUrl

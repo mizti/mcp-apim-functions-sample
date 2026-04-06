@@ -6,7 +6,7 @@ from typing import Any
 
 import azure.functions as func
 
-from orders import STORE, ValidationError, create_order
+from shipments import STORE, ValidationError, create_shipment
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 
@@ -19,9 +19,9 @@ def _json_response(payload: Any, status_code: int = 200) -> func.HttpResponse:
     )
 
 
-@app.route(route="orders", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
-def post_orders(req: func.HttpRequest) -> func.HttpResponse:
-    logging.info("POST /api/orders")
+@app.route(route="shipments", methods=["POST"], auth_level=func.AuthLevel.ANONYMOUS)
+def post_shipments(req: func.HttpRequest) -> func.HttpResponse:
+    logging.info("POST /api/shipments")
 
     try:
         payload = req.get_json()
@@ -34,32 +34,30 @@ def post_orders(req: func.HttpRequest) -> func.HttpResponse:
     idempotency_key = req.headers.get("Idempotency-Key")
 
     try:
-        order, warnings = create_order(payload, idempotency_key=idempotency_key)
+        shipment, warnings = create_shipment(payload, idempotency_key=idempotency_key)
     except ValidationError as ex:
         return _json_response({"error": str(ex)}, status_code=ex.status_code)
 
     response = {
-        "orderId": order.order_id,
-        "status": order.status,
-        "total": order.total,
-        "currency": order.currency,
-        "createdAt": order.created_at,
+        "trackingId": shipment.tracking_id,
+        "status": shipment.status,
+        "createdAt": shipment.created_at,
         "validationWarnings": warnings,
     }
 
     return _json_response(response, status_code=200)
 
 
-@app.route(route="orders/{orderId}", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
-def get_order(req: func.HttpRequest) -> func.HttpResponse:
-    order_id = req.route_params.get("orderId", "")
-    logging.info("GET /api/orders/%s", order_id)
+@app.route(route="shipments/{trackingId}", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
+def get_shipment(req: func.HttpRequest) -> func.HttpResponse:
+    tracking_id = req.route_params.get("trackingId", "")
+    logging.info("GET /api/shipments/%s", tracking_id)
 
-    if not order_id:
-        return _json_response({"error": "missing orderId"}, status_code=400)
+    if not tracking_id:
+        return _json_response({"error": "missing trackingId"}, status_code=400)
 
-    order = STORE.get_by_id(order_id)
-    if not order:
-        return _json_response({"error": "order not found"}, status_code=404)
+    shipment = STORE.get_by_id(tracking_id)
+    if not shipment:
+        return _json_response({"error": "shipment not found"}, status_code=404)
 
-    return _json_response(order.to_dict(), status_code=200)
+    return _json_response(shipment.to_dict(), status_code=200)

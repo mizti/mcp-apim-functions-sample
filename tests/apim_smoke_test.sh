@@ -5,9 +5,9 @@
 # =============================================================================
 # - Mirrors tests/functions_smoke_test.sh, but targets APIM as the gateway.
 # - Validates:
-#   - REST API through APIM: POST/GET /api/orders
-#   - MCP server (Existing MCP server): tools/list + menu tools/call
-#   - MCP server (REST API as MCP server): tools/list + orders tools/call (create)
+#   - REST API through APIM: POST/GET /api/shipments
+#   - MCP server (Existing MCP server): tools/list + shipment tools/call
+#   - MCP server (REST API as MCP server): tools/list + shipments tools/call (create)
 #
 # Usage:
 #   ./tests/apim_smoke_test.sh
@@ -232,8 +232,8 @@ fi
 APIM_BASE_URL="${apimGatewayUrl:-${APIM_BASE_URL:-}}"
 APIM_SUBSCRIPTION_KEY="${apimSubscriptionKey:-${APIM_SUBSCRIPTION_KEY:-}}"
 
-export APIM_MENU_MCP_BASE_PATH="/menu-mcp/runtime/webhooks"
-export APIM_ORDERS_MCP_BASE_PATH="/restaurant-order-mcp"
+export APIM_MENU_MCP_BASE_PATH="/shipment-mcp/runtime/webhooks"
+export APIM_ORDERS_MCP_BASE_PATH="/shipment-rest-mcp"
 
 # These are not produced by Bicep outputs in this repo; set them explicitly.
 #
@@ -262,18 +262,18 @@ if [ -z "$APIM_SUBSCRIPTION_KEY" ]; then
 fi
 
 if [ -z "$MENU_MCP_URL" ]; then
-  error "Menu MCP server URL is not set (expected APIM_MENU_MCP_SERVER_URL or APIM_MENU_MCP_BASE_PATH)"
+  error "Shipment MCP server URL is not set (expected APIM_MENU_MCP_SERVER_URL or APIM_MENU_MCP_BASE_PATH)"
   exit 1
 fi
 
 if [ -z "$ORDERS_MCP_URL" ]; then
-  error "Orders MCP server URL is not set (expected APIM_ORDERS_MCP_SERVER_URL or APIM_ORDERS_MCP_BASE_PATH)"
+  error "Shipment REST MCP server URL is not set (expected APIM_ORDERS_MCP_SERVER_URL or APIM_ORDERS_MCP_BASE_PATH)"
   exit 1
 fi
 
 info "APIM base URL: $APIM_BASE_URL"
-info "Menu MCP server URL: $MENU_MCP_URL"
-info "Orders MCP server URL: $ORDERS_MCP_URL"
+info "Shipment MCP server URL: $MENU_MCP_URL"
+info "Shipment REST MCP server URL: $ORDERS_MCP_URL"
 
 # =============================================================================
 # REST tests (via APIM)
@@ -282,49 +282,50 @@ info "=========================================="
 info "REST API smoke tests (via APIM)"
 info "=========================================="
 
-info "Test REST-1: POST /api/orders"
+info "Test REST-1: POST /api/shipments"
 IDEMPOTENCY_KEY="apim-smoke-$(date +%s)"
-REST_ORDER_REQUEST='{
-  "menuVersion": "v1",
-  "items": [
-    { "menuItemId": "ramen-shoyu", "quantity": 1 }
-  ],
-  "note": "apim smoke test",
-  "pickupTime": "2026-02-04T13:30:00+09:00"
+REST_SHIPMENT_REQUEST='{
+  "senderName": "田中太郎",
+  "recipientName": "佐藤花子",
+  "from": "東京都千代田区",
+  "to": "大阪府大阪市",
+  "weightKg": 10,
+  "sizeCm": "40x30x20",
+  "note": "apim smoke test"
 }'
 
 info "REST request body:"
-printf '%s\n' "$REST_ORDER_REQUEST" | pretty_json
+printf '%s\n' "$REST_SHIPMENT_REQUEST" | pretty_json
 
-RESPONSE=$(curl_rest -X POST "${APIM_BASE_URL%/}/api/orders" \
+RESPONSE=$(curl_rest -X POST "${APIM_BASE_URL%/}/api/shipments" \
   -H "Content-Type: application/json" \
   -H "Idempotency-Key: $IDEMPOTENCY_KEY" \
-  -d "$REST_ORDER_REQUEST")
+  -d "$REST_SHIPMENT_REQUEST")
 split_curl_response "$RESPONSE"
 
 info "REST response body (HTTP $HTTP_CODE):"
 printf '%s\n' "$BODY" | pretty_json
 
-ORDER_ID=""
+TRACKING_ID=""
 if [ "$HTTP_CODE" = "200" ]; then
   if has_cmd jq; then
-    ORDER_ID=$(printf '%s\n' "$BODY" | jq -r '.orderId // empty' 2>/dev/null || true)
+    TRACKING_ID=$(printf '%s\n' "$BODY" | jq -r '.trackingId // empty' 2>/dev/null || true)
   else
-    ORDER_ID=$(extract_json_string_field "$BODY" "orderId" || true)
+    TRACKING_ID=$(extract_json_string_field "$BODY" "trackingId" || true)
   fi
 
-  if [ -n "$ORDER_ID" ]; then
-    success "Order created via APIM (HTTP $HTTP_CODE, orderId=$ORDER_ID)"
+  if [ -n "$TRACKING_ID" ]; then
+    success "Shipment created via APIM (HTTP $HTTP_CODE, trackingId=$TRACKING_ID)"
   else
-    error "Order created via APIM but orderId missing"
+    error "Shipment created via APIM but trackingId missing"
   fi
 else
-  error "POST /api/orders via APIM failed (HTTP $HTTP_CODE)"
+  error "POST /api/shipments via APIM failed (HTTP $HTTP_CODE)"
 fi
 
-if [ -n "$ORDER_ID" ]; then
-  info "Test REST-2: GET /api/orders/{orderId}"
-  RESPONSE=$(curl_rest -X GET "${APIM_BASE_URL%/}/api/orders/$ORDER_ID" \
+if [ -n "$TRACKING_ID" ]; then
+  info "Test REST-2: GET /api/shipments/{trackingId}"
+  RESPONSE=$(curl_rest -X GET "${APIM_BASE_URL%/}/api/shipments/$TRACKING_ID" \
     )
   split_curl_response "$RESPONSE"
 
@@ -332,55 +333,55 @@ if [ -n "$ORDER_ID" ]; then
   printf '%s\n' "$BODY" | pretty_json
 
   if [ "$HTTP_CODE" = "200" ]; then
-    success "Order fetched via APIM (HTTP $HTTP_CODE)"
+    success "Shipment fetched via APIM (HTTP $HTTP_CODE)"
   else
-    error "GET /api/orders/{orderId} via APIM failed (HTTP $HTTP_CODE)"
+    error "GET /api/shipments/{trackingId} via APIM failed (HTTP $HTTP_CODE)"
   fi
 else
-  warn "Skipping REST-2 (orderId not available)"
+  warn "Skipping REST-2 (trackingId not available)"
 fi
 
 # =============================================================================
-# MCP tests (via APIM) - Menu MCP server (Existing MCP server)
+# MCP tests (via APIM) - Shipment Tracking MCP server (Existing MCP server)
 # =============================================================================
 info "=========================================="
-info "MCP (menu) smoke tests (via APIM)"
+info "MCP (shipment tracking) smoke tests (via APIM)"
 info "=========================================="
 
-info "Test MCP-MENU-1: tools/list"
+info "Test MCP-TRACKING-1: tools/list"
 RESPONSE=$(curl_mcp -X POST "$MENU_MCP_URL" \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}')
 split_curl_response "$RESPONSE"
 
 if [ "$HTTP_CODE" = "200" ]; then
-  success "menu tools/list succeeded (HTTP $HTTP_CODE)"
+  success "shipment tracking tools/list succeeded (HTTP $HTTP_CODE)"
 else
-  error "menu tools/list failed (HTTP $HTTP_CODE, curlExit=$CURL_EXIT_CODE)"
+  error "shipment tracking tools/list failed (HTTP $HTTP_CODE, curlExit=$CURL_EXIT_CODE)"
 fi
 dump_body_mcp "$BODY"
 
-info "Test MCP-MENU-2: tools/call get_list_menus"
+info "Test MCP-TRACKING-2: tools/call track_shipment (QS-001)"
 RESPONSE=$(curl_mcp -X POST "$MENU_MCP_URL" \
   -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"get_list_menus","arguments":{}}}')
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"track_shipment","arguments":{"trackingId":"QS-001"}}}')
 split_curl_response "$RESPONSE"
 
 if [ "$HTTP_CODE" = "200" ]; then
-  success "menu tools/call get_list_menus succeeded (HTTP $HTTP_CODE)"
+  success "shipment tracking tools/call track_shipment succeeded (HTTP $HTTP_CODE)"
 else
-  error "menu tools/call get_list_menus failed (HTTP $HTTP_CODE, curlExit=$CURL_EXIT_CODE)"
+  error "shipment tracking tools/call track_shipment failed (HTTP $HTTP_CODE, curlExit=$CURL_EXIT_CODE)"
 fi
 dump_body_mcp "$BODY"
 
 # =============================================================================
-# MCP tests (via APIM) - Orders MCP server (REST API as MCP server)
+# MCP tests (via APIM) - Shipment REST MCP server (REST API as MCP server)
 # =============================================================================
 info "=========================================="
-info "MCP (orders) smoke tests (via APIM)"
+info "MCP (shipment REST) smoke tests (via APIM)"
 info "=========================================="
 
-info "Test MCP-ORDERS-1: tools/list"
+info "Test MCP-REST-1: tools/list"
 info "Calling: $ORDERS_MCP_URL (maxTime=${CURL_MAX_TIME_MCP}s)"
 RESPONSE=$(curl_mcp -X POST "$ORDERS_MCP_URL" \
   -H "Content-Type: application/json" \
@@ -388,65 +389,65 @@ RESPONSE=$(curl_mcp -X POST "$ORDERS_MCP_URL" \
 split_curl_response "$RESPONSE"
 
 if [ "$HTTP_CODE" = "200" ]; then
-  success "orders tools/list succeeded (HTTP $HTTP_CODE)"
+  success "shipment REST tools/list succeeded (HTTP $HTTP_CODE)"
 else
-  error "orders tools/list failed (HTTP $HTTP_CODE, curlExit=$CURL_EXIT_CODE)"
+  error "shipment REST tools/list failed (HTTP $HTTP_CODE, curlExit=$CURL_EXIT_CODE)"
 fi
 dump_body_mcp "$BODY"
 
 # Tool names are generated by APIM from OpenAPI and are stable in this sample.
 # Parsing `tools/list` is brittle due to SSE framing differences, so we keep the
 # `tools/list` call above as a health check, but hardcode tool names for calls.
-CREATE_TOOL="createAnOrder"
+CREATE_TOOL="createAShipment"
 
-info "Test MCP-ORDERS-2: tools/call $CREATE_TOOL"
-ORDERS_CREATE_ARGS_DIRECT='{
-  "menuVersion": "v1",
-  "items": [
-    { "menuItemId": "ramen-shoyu", "quantity": 1 }
-  ],
-  "note": "apim mcp smoke test",
-  "pickupTime": "2026-02-04T13:30:00+09:00"
+info "Test MCP-REST-2: tools/call $CREATE_TOOL"
+SHIPMENT_CREATE_ARGS_DIRECT='{
+  "recipientName": "佐藤花子",
+  "from": "東京都千代田区",
+  "to": "大阪府大阪市",
+  "weightKg": 10,
+  "sizeCm": "40x30x20",
+  "note": "apim mcp smoke test"
 }'
 
 MCP_IDEMPOTENCY_KEY="apim-mcp-smoke-$(date +%s)"
-ORDERS_CREATE_ARGS_WRAPPED="{\"Idempotency-Key\":\"$MCP_IDEMPOTENCY_KEY\",\"CreateOrderRequest\":$ORDERS_CREATE_ARGS_DIRECT}"
+SHIPMENT_CREATE_ARGS_WRAPPED="{\"Idempotency-Key\":\"$MCP_IDEMPOTENCY_KEY\",\"CreateShipmentRequest\":$SHIPMENT_CREATE_ARGS_DIRECT}"
 
-# Attempt A: arguments = { Idempotency-Key, CreateOrderRequest }
+# Attempt A: arguments = { Idempotency-Key, CreateShipmentRequest }
 RESPONSE=$(curl_mcp -X POST "$ORDERS_MCP_URL" \
   -H "Content-Type: application/json" \
-  -d "{\"jsonrpc\":\"2.0\",\"id\":11,\"method\":\"tools/call\",\"params\":{\"name\":\"$CREATE_TOOL\",\"arguments\":$ORDERS_CREATE_ARGS_WRAPPED}}")
+  -d "{\"jsonrpc\":\"2.0\",\"id\":11,\"method\":\"tools/call\",\"params\":{\"name\":\"$CREATE_TOOL\",\"arguments\":$SHIPMENT_CREATE_ARGS_WRAPPED}}")
 split_curl_response "$RESPONSE"
 
 HAS_ERROR=$(mcp_has_error "$BODY" || true)
 if [ "$HTTP_CODE" = "200" ] && [ "$HAS_ERROR" = "no" ]; then
-  success "orders tools/call $CREATE_TOOL succeeded (wrapped CreateOrderRequest)"
+  success "shipment REST tools/call $CREATE_TOOL succeeded (wrapped CreateShipmentRequest)"
 else
-  warn "orders tools/call (wrapped CreateOrderRequest) may have failed (HTTP $HTTP_CODE, error=$HAS_ERROR); trying direct args"
+  warn "shipment REST tools/call (wrapped CreateShipmentRequest) may have failed (HTTP $HTTP_CODE, error=$HAS_ERROR); trying direct args"
 
   # Attempt B: arguments = request body fields (some gateways flatten)
   RESPONSE=$(curl_mcp -X POST "$ORDERS_MCP_URL" \
     -H "Content-Type: application/json" \
-    -d "{\"jsonrpc\":\"2.0\",\"id\":12,\"method\":\"tools/call\",\"params\":{\"name\":\"$CREATE_TOOL\",\"arguments\":$ORDERS_CREATE_ARGS_DIRECT}}")
+    -d "{\"jsonrpc\":\"2.0\",\"id\":12,\"method\":\"tools/call\",\"params\":{\"name\":\"$CREATE_TOOL\",\"arguments\":$SHIPMENT_CREATE_ARGS_DIRECT}}")
   split_curl_response "$RESPONSE"
 
   HAS_ERROR=$(mcp_has_error "$BODY" || true)
   if [ "$HTTP_CODE" = "200" ] && [ "$HAS_ERROR" = "no" ]; then
-    success "orders tools/call $CREATE_TOOL succeeded (direct args)"
+    success "shipment REST tools/call $CREATE_TOOL succeeded (direct args)"
   else
-    warn "orders tools/call (direct args) may have failed (HTTP $HTTP_CODE, error=$HAS_ERROR); trying wrapped body"
+    warn "shipment REST tools/call (direct args) may have failed (HTTP $HTTP_CODE, error=$HAS_ERROR); trying wrapped body"
 
     # Attempt C: arguments = { body: <request> }
     RESPONSE=$(curl_mcp -X POST "$ORDERS_MCP_URL" \
       -H "Content-Type: application/json" \
-      -d "{\"jsonrpc\":\"2.0\",\"id\":13,\"method\":\"tools/call\",\"params\":{\"name\":\"$CREATE_TOOL\",\"arguments\":{\"body\":$ORDERS_CREATE_ARGS_DIRECT}}}")
+      -d "{\"jsonrpc\":\"2.0\",\"id\":13,\"method\":\"tools/call\",\"params\":{\"name\":\"$CREATE_TOOL\",\"arguments\":{\"body\":$SHIPMENT_CREATE_ARGS_DIRECT}}}")
     split_curl_response "$RESPONSE"
 
     HAS_ERROR=$(mcp_has_error "$BODY" || true)
     if [ "$HTTP_CODE" = "200" ] && [ "$HAS_ERROR" = "no" ]; then
-      success "orders tools/call $CREATE_TOOL succeeded (wrapped body)"
+      success "shipment REST tools/call $CREATE_TOOL succeeded (wrapped body)"
     else
-      error "orders tools/call $CREATE_TOOL failed (HTTP $HTTP_CODE, error=$HAS_ERROR)"
+      error "shipment REST tools/call $CREATE_TOOL failed (HTTP $HTTP_CODE, error=$HAS_ERROR)"
     fi
   fi
 fi

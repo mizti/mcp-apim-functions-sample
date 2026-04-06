@@ -3,11 +3,11 @@ metadata:
   template: mcp-apim-functions-sample
 
 services:
-  menu:
+  mcp:
     project: src/mcp_function
     language: python
     host: function
-  orders:
+  rest:
     project: src/rest_function
     language: python
     host: function

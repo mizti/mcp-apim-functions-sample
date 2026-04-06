@@ -163,21 +163,21 @@ info "Loading azd environment values..."
 # (azd outputs KEY="VALUE" lines; eval is intentional)
 eval "$(azd env get-values)"
 
-MENU_MCP_ENDPOINT="${menuFunctionMcpEndpoint:-}"
-ORDERS_BASE_URL="${ordersFunctionBaseUrl:-}"
+MENU_MCP_ENDPOINT="${mcpFunctionMcpEndpoint:-}"
+ORDERS_BASE_URL="${restFunctionBaseUrl:-}"
 
 if [ -z "$MENU_MCP_ENDPOINT" ]; then
-  error "menuFunctionMcpEndpoint is not set (run: azd env get-values)"
+  error "mcpFunctionMcpEndpoint is not set (run: azd env get-values)"
   exit 1
 fi
 
 if [ -z "$ORDERS_BASE_URL" ]; then
-  error "ordersFunctionBaseUrl is not set (run: azd env get-values)"
+  error "restFunctionBaseUrl is not set (run: azd env get-values)"
   exit 1
 fi
 
 info "MCP endpoint: $MENU_MCP_ENDPOINT"
-info "Orders base URL: $ORDERS_BASE_URL"
+info "REST base URL: $ORDERS_BASE_URL"
 
 # =============================================================================
 # REST tests
@@ -186,53 +186,54 @@ info "=========================================="
 info "REST API smoke tests"
 info "=========================================="
 
-info "Test REST-1: POST /api/orders"
+info "Test REST-1: POST /api/shipments"
 IDEMPOTENCY_KEY="smoke-$(date +%s)"
-REST_ORDER_REQUEST='{
-  "menuVersion": "v1",
-  "items": [
-    { "menuItemId": "ramen-shoyu", "quantity": 1 }
-  ],
-  "note": "smoke test",
-  "pickupTime": "2026-02-04T13:30:00+09:00"
+REST_SHIPMENT_REQUEST='{
+  "senderName": "田中太郎",
+  "recipientName": "佐藤花子",
+  "from": "東京都千代田区",
+  "to": "大阪府大阪市",
+  "weightKg": 10,
+  "sizeCm": "40x30x20",
+  "note": "smoke test"
 }'
 
 info "REST request body:"
-printf '%s\n' "$REST_ORDER_REQUEST" | pretty_json
+printf '%s\n' "$REST_SHIPMENT_REQUEST" | pretty_json
 
-RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "${ORDERS_BASE_URL%/}/api/orders" \
+RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "${ORDERS_BASE_URL%/}/api/shipments" \
   -H "Content-Type: application/json" \
   -H "Idempotency-Key: $IDEMPOTENCY_KEY" \
-  -d "$REST_ORDER_REQUEST")
+  -d "$REST_SHIPMENT_REQUEST")
 split_curl_response "$RESPONSE"
 
 info "REST response body (HTTP $HTTP_CODE):"
 printf '%s\n' "$BODY" | pretty_json
 
-ORDER_ID=""
+TRACKING_ID=""
 if [ "$HTTP_CODE" = "200" ]; then
-  # Extract orderId
-  ORDER_ID=$(printf '%s' "$BODY" | "$PY" -c 'import json,sys
+  # Extract trackingId
+  TRACKING_ID=$(printf '%s' "$BODY" | "$PY" -c 'import json,sys
 try:
     obj=json.loads(sys.stdin.read() or "{}")
-    print(obj.get("orderId", ""))
+    print(obj.get("trackingId", ""))
 except Exception:
     print("")' || true)
 
-  if [ -n "$ORDER_ID" ]; then
-    success "Order created (HTTP $HTTP_CODE, orderId=$ORDER_ID)"
+  if [ -n "$TRACKING_ID" ]; then
+    success "Shipment created (HTTP $HTTP_CODE, trackingId=$TRACKING_ID)"
   else
-    error "Order created but orderId missing"
+    error "Shipment created but trackingId missing"
     printf '%s\n' "$BODY"
   fi
 else
-  error "POST /api/orders failed (HTTP $HTTP_CODE)"
+  error "POST /api/shipments failed (HTTP $HTTP_CODE)"
   printf '%s\n' "$BODY"
 fi
 
-if [ -n "$ORDER_ID" ]; then
-  info "Test REST-2: GET /api/orders/{orderId}"
-  RESPONSE=$(curl -s -w "\n%{http_code}" -X GET "${ORDERS_BASE_URL%/}/api/orders/$ORDER_ID")
+if [ -n "$TRACKING_ID" ]; then
+  info "Test REST-2: GET /api/shipments/{trackingId}"
+  RESPONSE=$(curl -s -w "\n%{http_code}" -X GET "${ORDERS_BASE_URL%/}/api/shipments/$TRACKING_ID")
   split_curl_response "$RESPONSE"
 
   info "REST response body (HTTP $HTTP_CODE):"
@@ -243,22 +244,22 @@ if [ -n "$ORDER_ID" ]; then
     GOT_ID=$(printf '%s' "$BODY" | "$PY" -c 'import json,sys
 try:
     obj=json.loads(sys.stdin.read() or "{}")
-    print(obj.get("orderId", ""))
+    print(obj.get("trackingId", ""))
 except Exception:
     print("")' || true)
 
-    if [ "$GOT_ID" = "$ORDER_ID" ]; then
-      success "Order fetched (HTTP $HTTP_CODE)"
+    if [ "$GOT_ID" = "$TRACKING_ID" ]; then
+      success "Shipment fetched (HTTP $HTTP_CODE)"
     else
-      error "Order fetched but orderId mismatch (expected $ORDER_ID, got $GOT_ID)"
+      error "Shipment fetched but trackingId mismatch (expected $TRACKING_ID, got $GOT_ID)"
       printf '%s\n' "$BODY"
     fi
   else
-    error "GET /api/orders/{orderId} failed (HTTP $HTTP_CODE)"
+    error "GET /api/shipments/{trackingId} failed (HTTP $HTTP_CODE)"
     printf '%s\n' "$BODY"
   fi
 else
-  warn "Skipping REST-2 (orderId not available)"
+  warn "Skipping REST-2 (trackingId not available)"
 fi
 
 # =============================================================================
@@ -282,42 +283,42 @@ else
 fi
 dump_body_mcp "$BODY"
 
-info "Test MCP-2: tools/call get_list_menus"
+info "Test MCP-2: tools/call track_shipment (QS-001)"
 RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$MENU_MCP_ENDPOINT" \
   -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"get_list_menus","arguments":{}}}')
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"track_shipment","arguments":{"trackingId":"QS-001"}}}')
 split_curl_response "$RESPONSE"
 
 if [ "$HTTP_CODE" = "200" ]; then
-  success "tools/call get_list_menus succeeded (HTTP $HTTP_CODE)"
+  success "tools/call track_shipment succeeded (HTTP $HTTP_CODE)"
 else
-  error "tools/call get_list_menus failed (HTTP $HTTP_CODE)"
+  error "tools/call track_shipment failed (HTTP $HTTP_CODE)"
 fi
 dump_body_mcp "$BODY"
 
-info "Test MCP-3: tools/call get_menu_details (ramen-shoyu)"
+info "Test MCP-3: tools/call get_shipment_details (QS-001)"
 RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$MENU_MCP_ENDPOINT" \
   -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_menu_details","arguments":{"itemId":"ramen-shoyu"}}}')
+  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_shipment_details","arguments":{"trackingId":"QS-001"}}}')
 split_curl_response "$RESPONSE"
 
 if [ "$HTTP_CODE" = "200" ]; then
-  success "tools/call get_menu_details succeeded (HTTP $HTTP_CODE)"
+  success "tools/call get_shipment_details succeeded (HTTP $HTTP_CODE)"
 else
-  error "tools/call get_menu_details failed (HTTP $HTTP_CODE)"
+  error "tools/call get_shipment_details failed (HTTP $HTTP_CODE)"
 fi
 dump_body_mcp "$BODY"
 
-info "Test MCP-4: tools/call get_constraints"
+info "Test MCP-4: tools/call get_shipping_rules"
 RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$MENU_MCP_ENDPOINT" \
   -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"get_constraints","arguments":{}}}')
+  -d '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"get_shipping_rules","arguments":{}}}')
 split_curl_response "$RESPONSE"
 
 if [ "$HTTP_CODE" = "200" ]; then
-  success "tools/call get_constraints succeeded (HTTP $HTTP_CODE)"
+  success "tools/call get_shipping_rules succeeded (HTTP $HTTP_CODE)"
 else
-  error "tools/call get_constraints failed (HTTP $HTTP_CODE)"
+  error "tools/call get_shipping_rules failed (HTTP $HTTP_CODE)"
 fi
 dump_body_mcp "$BODY"
 

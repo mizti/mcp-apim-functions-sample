@@ -6,8 +6,8 @@
   },
   "extensions": {
     "mcp": {
-      "instructions": "Provides restaurant menu and ordering constraints as MCP tools.",
-      "serverName": "MenuMcpServer",
+      "instructions": "Provides shipment tracking, shipment details, and shipping rules as MCP tools.",
+      "serverName": "ShipmentMcpServer",
       "serverVersion": "1.0.0",
       "system": {
         "webhookAuthorizationLevel": "Anonymous"

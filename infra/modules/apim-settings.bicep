@@ -3,11 +3,11 @@ targetScope = 'resourceGroup'
 @description('Existing APIM service name to configure')
 param apimName string
 
-@description('Menu Function base URL (e.g. https://<app>.azurewebsites.net)')
-param menuFunctionBaseUrl string
+@description('Shipment MCP Function base URL (e.g. https://<app>.azurewebsites.net)')
+param shipmentMcpFunctionBaseUrl string
 
-@description('Orders Function base URL (e.g. https://<app>.azurewebsites.net)')
-param ordersFunctionBaseUrl string
+@description('Shipment REST Function base URL (e.g. https://<app>.azurewebsites.net)')
+param shipmentRestFunctionBaseUrl string
 
 @description('Subscription key header name (defaults to APIM standard)')
 param subscriptionKeyHeaderName string = 'Ocp-Apim-Subscription-Key'
@@ -18,25 +18,25 @@ param subscriptionKeyQueryName string = 'subscription-key'
 // -----------------------------------------------------------------------------
 // Constants (IDs / paths)
 // -----------------------------------------------------------------------------
-var menuMcpApiId = 'menu-list-mcp'
-var menuMcpApiDisplayName = 'Menu List MCP'
-var menuMcpApiDescription = 'このレストランのメニューの一覧や詳細、現在の注文制限を参照できます'
-var menuMcpApiPath = 'menu-mcp'
+var shipmentMcpApiId = 'shipment-tracking-mcp'
+var shipmentMcpApiDisplayName = 'Shipment Tracking MCP'
+var shipmentMcpApiDescription = '配送の追跡、配送詳細の参照、配送ルールの確認ができます'
+var shipmentMcpApiPath = 'shipment-mcp'
 
-var ordersApiId = 'restaurant-orders-api'
-var ordersApiDisplayName = 'Restaurant Orders API'
-var ordersApiDescription = 'Minimal REST API for creating and reading orders.\n\nThis OpenAPI document is derived from docs/SPECS.md in this repository.\n'
-var ordersApiPath = 'api'
+var shipmentsApiId = 'shipment-api'
+var shipmentsApiDisplayName = 'Shipment API'
+var shipmentsApiDescription = 'Minimal REST API for creating and reading shipments.\n\nThis OpenAPI document is derived from docs/SPECS.md in this repository.\n'
+var shipmentsApiPath = 'api'
 
-var ordersMcpApiId = 'restaurant-order-mcp'
-var ordersMcpApiDisplayName = 'Restaurant Order MCP'
-var ordersMcpApiPath = 'restaurant-order-mcp'
+var shipmentsMcpApiId = 'shipment-rest-mcp'
+var shipmentsMcpApiDisplayName = 'Shipment REST MCP'
+var shipmentsMcpApiPath = 'shipment-rest-mcp'
 
-var menuPolicyXml = loadTextContent('./policies/menu-mcp-api-policy.xml')
-var ordersMcpPolicyXml = loadTextContent('./policies/orders-mcp-api-policy.xml')
+var shipmentMcpPolicyXml = loadTextContent('./policies/menu-mcp-api-policy.xml')
+var shipmentsMcpPolicyXml = loadTextContent('./policies/orders-mcp-api-policy.xml')
 
 // For Existing MCP server, APIM should call the Functions MCP Streamable HTTP endpoint directly.
-var menuFunctionMcpUrl = '${menuFunctionBaseUrl}/runtime/webhooks/mcp'
+var shipmentMcpFunctionUrl = '${shipmentMcpFunctionBaseUrl}/runtime/webhooks/mcp'
 
 resource apim 'Microsoft.ApiManagement/service@2024-05-01' existing = {
 	name: apimName
@@ -46,11 +46,11 @@ resource apim 'Microsoft.ApiManagement/service@2024-05-01' existing = {
 // Backends
 // -----------------------------------------------------------------------------
 // Existing MCP server (Functions MCP extension endpoint) is forwarded via policy.
-resource menuBackend 'Microsoft.ApiManagement/service/backends@2024-06-01-preview' = {
+resource shipmentMcpBackend 'Microsoft.ApiManagement/service/backends@2024-06-01-preview' = {
 	parent: apim
-	name: 'menu-mcp-backend'
+	name: 'shipment-mcp-backend'
 	properties: {
-		url: menuFunctionMcpUrl
+		url: shipmentMcpFunctionUrl
 		protocol: 'http'
 	}
 }
@@ -58,16 +58,16 @@ resource menuBackend 'Microsoft.ApiManagement/service/backends@2024-06-01-previe
 // -----------------------------------------------------------------------------
 // API 1: Existing MCP server (proxy to Functions MCP extension)
 // -----------------------------------------------------------------------------
-resource menuMcpApi 'Microsoft.ApiManagement/service/apis@2025-03-01-preview' = {
+resource shipmentMcpApi 'Microsoft.ApiManagement/service/apis@2025-03-01-preview' = {
 	parent: apim
-	name: menuMcpApiId
+	name: shipmentMcpApiId
 	properties: {
-		displayName: menuMcpApiDisplayName
+		displayName: shipmentMcpApiDisplayName
 		apiRevision: '1'
-		description: menuMcpApiDescription
+		description: shipmentMcpApiDescription
 		subscriptionRequired: false
-		backendId: menuBackend.id
-		path: menuMcpApiPath
+		backendId: shipmentMcpBackend.id
+		path: shipmentMcpApiPath
 		protocols: [
 			'https'
 		]
@@ -83,37 +83,37 @@ resource menuMcpApi 'Microsoft.ApiManagement/service/apis@2025-03-01-preview' = 
 		isCurrent: true
 	}
 	dependsOn: [
-		menuBackend
+		shipmentMcpBackend
 	]
 }
 
 
-resource menuMcpApiPolicy 'Microsoft.ApiManagement/service/apis/policies@2024-06-01-preview' = {
-	parent: menuMcpApi
+resource shipmentMcpApiPolicy 'Microsoft.ApiManagement/service/apis/policies@2024-06-01-preview' = {
+	parent: shipmentMcpApi
 	name: 'policy'
 	properties: {
-		value: menuPolicyXml
+		value: shipmentMcpPolicyXml
 		format: 'xml'
 	}
 }
 /*
 // -----------------------------------------------------------------------------
-// API 2: REST API (orders)
+// API 2: REST API (shipments)
 // -----------------------------------------------------------------------------
 // The Functions app exposes routes under /api/* by default.
 // By setting serviceUrl to {functionBaseUrl}/api and APIM API path to 'api',
-// the public gateway URL becomes /api/orders and the backend URL becomes /api/orders.
-var ordersApiServiceUrl = '${ordersFunctionBaseUrl}/api'
+// the public gateway URL becomes /api/shipments and the backend URL becomes /api/shipments.
+var shipmentsApiServiceUrl = '${shipmentRestFunctionBaseUrl}/api'
 
-resource ordersApi 'Microsoft.ApiManagement/service/apis@2024-06-01-preview' = {
+resource shipmentsApi 'Microsoft.ApiManagement/service/apis@2024-06-01-preview' = {
 	parent: apim
-	name: ordersApiId
+	name: shipmentsApiId
 	properties: {
-		displayName: ordersApiDisplayName
+		displayName: shipmentsApiDisplayName
 		apiRevision: '1'
-		description: ordersApiDescription
+		description: shipmentsApiDescription
 		subscriptionRequired: false
-		serviceUrl: ordersApiServiceUrl
+		serviceUrl: shipmentsApiServiceUrl
 		protocols: [
 			'http'
 			'https'
@@ -127,19 +127,19 @@ resource ordersApi 'Microsoft.ApiManagement/service/apis@2024-06-01-preview' = {
 			query: subscriptionKeyQueryName
 		}
 		isCurrent: true
-		path: ordersApiPath
+		path: shipmentsApiPath
 	}
 }
 
-resource createOrderOp 'Microsoft.ApiManagement/service/apis/operations@2024-06-01-preview' = {
-	parent: ordersApi
-	name: 'createOrder'
+resource createShipmentOp 'Microsoft.ApiManagement/service/apis/operations@2024-06-01-preview' = {
+	parent: shipmentsApi
+	name: 'createShipment'
 	properties: {
-		displayName: 'Create an order'
+		displayName: 'Create a shipment'
 		method: 'POST'
-		urlTemplate: '/orders'
+		urlTemplate: '/shipments'
 		templateParameters: []
-		description: 'Create a new order.'
+		description: 'Register a new shipment for delivery.'
 		request: {
 			queryParameters: []
 			headers: [
@@ -156,15 +156,13 @@ resource createOrderOp 'Microsoft.ApiManagement/service/apis/operations@2024-06-
 					examples: {
 						example: {
 							value: {
-								menuVersion: 'v1'
-								items: [
-									{
-										menuItemId: 'ramen-shoyu'
-										quantity: 1
-									}
-								]
-								note: 'No onions'
-								pickupTime: '2026-02-04T13:30:00+09:00'
+								senderName: '田中太郎'
+								recipientName: '佐藤花子'
+								from: '東京都千代田区'
+								to: '大阪府大阪市'
+								weightKg: 10
+								sizeCm: '40x30x20'
+								note: '割れ物注意'
 							}
 						}
 					}
@@ -174,18 +172,16 @@ resource createOrderOp 'Microsoft.ApiManagement/service/apis/operations@2024-06-
 		responses: [
 			{
 				statusCode: 200
-				description: 'Order created'
+				description: 'Shipment created'
 				representations: [
 					{
 						contentType: 'application/json'
 						examples: {
 							example: {
 								value: {
-									orderId: 'ord_xxxxxxxx'
-									status: 'confirmed'
-									total: 900
-									currency: 'JPY'
-									createdAt: '2026-02-04T13:00:00+09:00'
+									trackingId: 'QS-xxxxxxxx'
+									status: 'pending'
+									createdAt: '2026-04-03T10:00:00+09:00'
 									validationWarnings: []
 								}
 							}
@@ -196,7 +192,7 @@ resource createOrderOp 'Microsoft.ApiManagement/service/apis/operations@2024-06-
 			}
 			{
 				statusCode: 400
-				description: 'Bad Request (invalid menuItemId, invalid quantity, etc.)'
+				description: 'Bad Request (missing required fields, weight over limit, etc.)'
 				representations: [
 					{
 						contentType: 'application/json'
@@ -214,69 +210,47 @@ resource createOrderOp 'Microsoft.ApiManagement/service/apis/operations@2024-06-
 				]
 				headers: []
 			}
-			{
-				statusCode: 409
-				description: 'Conflict (menuVersion mismatch)'
-				representations: [
-					{
-						contentType: 'application/json'
-						examples: {
-							default: {
-								value: {
-									error: {
-										code: 'Conflict'
-										message: 'Menu version mismatch'
-									}
-								}
-							}
-						}
-					}
-				]
-				headers: []
-			}
 		]
 	}
 }
 
-resource getOrderOp 'Microsoft.ApiManagement/service/apis/operations@2024-06-01-preview' = {
-	parent: ordersApi
-	name: 'getOrder'
+resource getShipmentOp 'Microsoft.ApiManagement/service/apis/operations@2024-06-01-preview' = {
+	parent: shipmentsApi
+	name: 'getShipment'
 	properties: {
-		displayName: 'Get an order'
+		displayName: 'Get a shipment'
 		method: 'GET'
-		urlTemplate: '/orders/{orderId}'
+		urlTemplate: '/shipments/{trackingId}'
 		templateParameters: [
 			{
-				name: 'orderId'
-				description: 'Order identifier (e.g., ord_xxxxxxxx)'
+				name: 'trackingId'
+				description: 'Tracking identifier (e.g., QS-001)'
 				type: 'string'
 				required: true
 				values: []
 			}
 		]
-		description: 'Get an existing order by id.'
+		description: 'Get an existing shipment by tracking ID.'
 		responses: [
 			{
 				statusCode: 200
-				description: 'Order'
+				description: 'Shipment'
 				representations: [
 					{
 						contentType: 'application/json'
 						examples: {
 							default: {
 								value: {
-									orderId: 'ord_xxxxxxxx'
-									status: 'confirmed'
-									items: [
-										{
-											menuItemId: 'ramen-shoyu'
-											quantity: 1
-											lineTotal: 900
-										}
-									]
-									total: 900
-									currency: 'JPY'
-									createdAt: '2026-02-04T13:00:00+09:00'
+									trackingId: 'QS-001'
+									status: 'delivered'
+									senderName: '田中太郎'
+									recipientName: '佐藤花子'
+									from: '東京都千代田区'
+									to: '大阪府大阪市'
+									weightKg: 10
+									sizeCm: '40x30x20'
+									note: '割れ物注意'
+									createdAt: '2026-04-01T09:00:00+09:00'
 								}
 							}
 						}
@@ -295,7 +269,7 @@ resource getOrderOp 'Microsoft.ApiManagement/service/apis/operations@2024-06-01-
 								value: {
 									error: {
 										code: 'NotFound'
-										message: 'Order not found'
+										message: 'Shipment not found'
 									}
 								}
 							}
@@ -311,14 +285,14 @@ resource getOrderOp 'Microsoft.ApiManagement/service/apis/operations@2024-06-01-
 // -----------------------------------------------------------------------------
 // API 3: REST API as MCP server (APIM-side MCP tools mapped to REST operations)
 // -----------------------------------------------------------------------------
-resource ordersMcpApi 'Microsoft.ApiManagement/service/apis@2024-06-01-preview' = {
+resource shipmentsMcpApi 'Microsoft.ApiManagement/service/apis@2024-06-01-preview' = {
 	parent: apim
-	name: ordersMcpApiId
+	name: shipmentsMcpApiId
 	properties: {
-		displayName: ordersMcpApiDisplayName
+		displayName: shipmentsMcpApiDisplayName
 		apiRevision: '1'
 		subscriptionRequired: false
-		path: ordersMcpApiPath
+		path: shipmentsMcpApiPath
 		protocols: [
 			'https'
 		]
@@ -334,17 +308,17 @@ resource ordersMcpApi 'Microsoft.ApiManagement/service/apis@2024-06-01-preview' 
 		isCurrent: true
 	}
 	dependsOn: [
-		ordersApi
-		createOrderOp
-		getOrderOp
+		shipmentsApi
+		createShipmentOp
+		getShipmentOp
 	]
 }
 
-resource ordersMcpApiPolicy 'Microsoft.ApiManagement/service/apis/policies@2024-06-01-preview' = {
-	parent: ordersMcpApi
+resource shipmentsMcpApiPolicy 'Microsoft.ApiManagement/service/apis/policies@2024-06-01-preview' = {
+	parent: shipmentsMcpApi
 	name: 'policy'
 	properties: {
-		value: ordersMcpPolicyXml
+		value: shipmentsMcpPolicyXml
 		format: 'xml'
 	}
 }
