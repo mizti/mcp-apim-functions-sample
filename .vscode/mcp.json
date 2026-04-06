@@ -1,0 +1,32 @@
+{
+  "servers": {
+    "shipment-tracking-mcp": {
+      "type": "http",
+      "url": "${input:apimGatewayUrl}/shipment-mcp/runtime/webhooks/mcp",
+      "headers": {
+        "Ocp-Apim-Subscription-Key": "${input:apimSubscriptionKey}"
+      }
+    },
+    "shipment-rest-mcp": {
+      "type": "http",
+      "url": "${input:apimGatewayUrl}/shipment-rest-mcp/mcp",
+      "headers": {
+        "Ocp-Apim-Subscription-Key": "${input:apimSubscriptionKey}"
+      }
+    }
+  },
+  "inputs": [
+    {
+      "id": "apimGatewayUrl",
+      "type": "promptString",
+      "description": "APIM Gateway URL (e.g. https://apim-xxx.azure-api.net)",
+      "password": false
+    },
+    {
+      "id": "apimSubscriptionKey",
+      "type": "promptString",
+      "description": "APIM Subscription Key (leave empty if not required)",
+      "password": true
+    }
+  ]
+}
