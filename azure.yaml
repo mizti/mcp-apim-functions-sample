@@ -2,6 +2,10 @@ name: mcp-apim-functions-sample
 metadata:
   template: mcp-apim-functions-sample
 
+pipeline:
+  variables:
+    - DEPLOY_APIM
+
 services:
   mcp:
     project: src/mcp_function
@@ -14,3 +18,9 @@ services:
 
 infra:
   path: infra
+
+prompt:
+  - name: DEPLOY_APIM
+    type: string
+    message: "Deploy API Management? (yes/no)"
+    default: "yes"

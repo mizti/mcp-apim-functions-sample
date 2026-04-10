@@ -20,6 +20,9 @@
     "apimSkuCapacity": {
       "value": 1
     },
+    "deployApim": {
+      "value": "${DEPLOY_APIM}"
+    },
     "functionRuntimeName": {
       "value": "python"
     },

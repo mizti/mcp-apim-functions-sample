@@ -34,6 +34,9 @@ param apimSkuName string = 'StandardV2'
 @description('APIM capacity (units). For Developer/Basic/Standard: 1+. For Premium: 1+.')
 param apimSkuCapacity int = 1
 
+@description('Whether to deploy API Management. Set "yes" to deploy, "no" to skip.')
+param deployApim string = 'yes'
+
 @description('Functions runtime name for Flex Consumption')
 @allowed([
   'python'
@@ -109,7 +112,7 @@ module restFunction './modules/functions.bicep' = {
   }
 }
 
-module apim './modules/apim.bicep' = {
+module apim './modules/apim.bicep' = if (deployApim == 'yes') {
   name: 'apim-${environmentName}-${token8}'
   scope: rg
   params: {
@@ -137,10 +140,10 @@ module apimSettings './modules/apim-settings.bicep' = {
 */
 
 @description('APIM gateway base URL')
-output apimGatewayUrl string = apim.outputs.apimGatewayUrl
+output apimGatewayUrl string = apim.?outputs.apimGatewayUrl ?? ''
 
 @description('APIM service name')
-output apimName string = apim.outputs.apimName
+output apimName string = apim.?outputs.apimName ?? ''
 
 @description('MCP Function (shipment tracking) hostname (direct)')
 output mcpFunctionHostname string = mcpFunction.outputs.functionHostname
