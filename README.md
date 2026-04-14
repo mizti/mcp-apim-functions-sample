@@ -186,6 +186,58 @@ API Management経由でMCPを設定できるようにしたい場合には以下
 ```
 を実行すると、APIM 経由で MCP toolsの疎通確認ができます。
 
+#### API Center テスト
+
+API Center に登録された API を REST API 経由で参照・検証するテストスクリプトが 2 種類あります。
+
+##### コントロールプレーン API テスト
+
+Azure Resource Manager（ARM）経由で API Center の情報を取得するテストです。`az rest` を使用するため、追加の認証設定は不要です。
+
+```bash
+./tests/apic_rest_api_test.sh
+```
+
+必要な権限: `Microsoft.ApiCenter/services/*/read`（Reader ロール等）
+構築したユーザーには自動的に付与されています
+
+##### データプレーン API テスト
+
+API Center データプレーン API（`https://<name>.data.<region>.azure-apicenter.ms`）を使用するテストです。エージェントが API Center から MCP サーバーをディスカバリするシナリオを想定しています。
+
+**前提条件（初回のみセットアップが必要）:**
+
+1. **Entra ID アプリ登録の作成**
+   Azure Portal > API Center > **API Center portal** > **Settings** > **Configure Entra ID** でポータルセットアップを実行します。これにより `<api-center-name>-apic-aad` という名前の Entra ID アプリ登録が自動的に作成され、必要なロールがサービスプリンシパルに付与されます。
+   
+   ただし、作成されるアプリは機密クライアント（confidential client）として構成されています。テストスクリプトはデバイスコードフロー（パブリッククライアントフロー）を使用するため、初回実行時にスクリプトが自動的にパブリッククライアントフローを有効化します。手動で設定する場合は Azure Portal > App registrations > `<api-center-name>-apic-aad` > **Authentication** > **Allow public client flows** を **Yes** に変更してください。
+
+2. **RBAC ロールの付与**
+   テスト実行ユーザーに **Azure API Center Data Reader** ロールを付与します。
+   ポータルセットアップでサービスプリンシパルには自動付与されますが、デバイスコードフロー（委任認証）ではトークンがユーザーの権限で発行されるため、**実行ユーザー自身にもロールが必要**です:
+   ```bash
+   az role assignment create \
+     --assignee "<user-object-id-or-upn>" \
+     --role "Azure API Center Data Reader" \
+     --scope "/subscriptions/<subscription-id>/resourceGroups/<rg>/providers/Microsoft.ApiCenter/services/<api-center-name>"
+   ```
+
+3. **テストの実行**
+   スクリプトは自動的に azd 環境から API Center 名・リージョンを検出し、`<api-center-name>-apic-aad` アプリ登録を探します。デバイスコードフロー認証を使用するため、実行時にブラウザでの認証が求められます。
+   ```bash
+   ./tests/apic_dataplane_test.sh
+   ```
+
+   環境変数で手動指定も可能です:
+   ```bash
+   APIC_SERVICE_NAME=apic-apimcp \
+   APIC_REGION=japaneast \
+   APIC_CLIENT_ID=<app-registration-client-id> \
+   ./tests/apic_dataplane_test.sh
+   ```
+
+> **Note:** データプレーン API は Azure CLI トークンでは直接アクセスできません（AADSTS65002）。Entra ID アプリ登録経由の認証が必要です。詳細は [API Center ポータルのセルフホスト](https://learn.microsoft.com/ja-jp/azure/api-center/enable-api-center-portal) を参照してください。
+
 #### 削除:
 
 ```bash
