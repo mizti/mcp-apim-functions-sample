@@ -37,6 +37,12 @@ param apimSkuCapacity int = 1
 @description('Whether to deploy API Management. Set "yes" to deploy, "no" to skip.')
 param deployApim string = 'yes'
 
+@description('Name of an existing APIM instance to use when deployApim is "no". Leave empty if deploying a new one.')
+param existingApimName string = ''
+
+@description('Resource group of the existing APIM instance. Defaults to the deployment resource group.')
+param existingApimResourceGroup string = ''
+
 @description('Functions runtime name for Flex Consumption')
 @allowed([
   'python'
@@ -126,6 +132,18 @@ module apim './modules/apim.bicep' = if (deployApim == 'yes') {
     resourceToken: resourceToken
   }
 }
+
+// When deployApim == 'no' and an existing APIM name is provided, reference it
+var useExistingApim = deployApim != 'yes' && !empty(existingApimName)
+var existingApimRg = !empty(existingApimResourceGroup) ? existingApimResourceGroup : rg.name
+
+module existingApimRef './modules/apim-existing.bicep' = if (useExistingApim) {
+  name: 'apim-existing-${environmentName}-${token8}'
+  scope: resourceGroup(existingApimRg)
+  params: {
+    apimName: existingApimName
+  }
+}
 /*
 //MCPサーバーを登録するBicepの書き方が見つけられていない
 module apimSettings './modules/apim-settings.bicep' = {
@@ -140,10 +158,13 @@ module apimSettings './modules/apim-settings.bicep' = {
 */
 
 @description('APIM gateway base URL')
-output apimGatewayUrl string = apim.?outputs.apimGatewayUrl ?? ''
+output apimGatewayUrl string = useExistingApim ? existingApimRef.outputs.apimGatewayUrl : (apim.?outputs.apimGatewayUrl ?? '')
 
 @description('APIM service name')
-output apimName string = apim.?outputs.apimName ?? ''
+output apimName string = useExistingApim ? existingApimName : (apim.?outputs.apimName ?? '')
+
+@description('APIM subscription key (built-in all-access). Empty if no APIM.')
+output apimSubscriptionKey string = useExistingApim ? existingApimRef.outputs.apimSubscriptionKey : ''
 
 @description('MCP Function (shipment tracking) hostname (direct)')
 output mcpFunctionHostname string = mcpFunction.outputs.functionHostname

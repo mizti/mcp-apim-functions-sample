@@ -24,3 +24,7 @@ prompt:
     type: string
     message: "Deploy API Management? (yes/no)"
     default: "yes"
+  - name: EXISTING_APIM_NAME
+    type: string
+    message: "Existing APIM instance name (leave empty if deploying new)"
+    default: ""
